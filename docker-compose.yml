@@ -1,0 +1,9 @@
+services:
+  server:
+    build: ./auth-provider/server
+    container_name: server
+    restart: always
+    ports:
+      - "8080:8000"
+    volumes:
+      - ./auth-provider/server:/usr/src/app
