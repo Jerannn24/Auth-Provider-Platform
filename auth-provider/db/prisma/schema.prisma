@@ -1,0 +1,155 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Effect {
+  ALLOW
+  DENY
+}
+
+enum Status {
+  ACTIVE
+  INACTIVE
+}
+
+enum SSOStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+}
+
+enum Result {
+  SUCCESS
+  FAILURE
+}
+
+model users {
+  id       String   @id @default(uuid()) @db.Uuid
+  name     String   
+  email    String   @unique 
+  password_hash String
+  status  Status @default(ACTIVE)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  user_groups user_groups[]
+  sso_sessions sso_sessions[]
+}
+
+model groups {
+  id      String   @id @default(uuid()) @db.Uuid
+  name     String   
+  description String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  user_groups user_groups[]
+  application_group_policies application_group_policies[]
+}
+
+model user_groups {
+  id      String   @id @default(uuid()) @db.Uuid
+  user_id String  @db.Uuid
+  group_id String @db.Uuid
+  created_at DateTime @default(now())
+
+  user  users   @relation(fields: [user_id], references: [id])
+  group groups  @relation(fields: [group_id], references: [id])
+  @@unique([user_id, group_id])
+}
+
+model applications{
+  id     String   @id @default(uuid()) @db.Uuid
+  name     String   
+  client_id String   @unique @db.Uuid
+  client_secret_hash String?
+  status  Status
+  launch_url String?
+  logout_notification_url String
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  
+  application_redirect_uris application_redirect_uris[]
+  application_group_policies application_group_policies[]
+}
+
+model application_redirect_uris {
+  id     String   @id @default(uuid()) @db.Uuid
+  application_id String @db.Uuid
+  redirect_uri String
+  created_at DateTime @default(now())
+
+  application applications @relation(fields: [application_id], references: [id])
+}
+
+model application_group_policies{
+  id    String   @id @default(uuid()) @db.Uuid
+  application_id String @db.Uuid
+  group_id String @db.Uuid
+  effect String
+  created_at DateTime @default(now())
+
+  application applications @relation(fields: [application_id], references: [id])
+  group groups @relation(fields: [group_id], references: [id])
+  @@unique([application_id, group_id, effect])
+}
+
+model sso_sessions {
+  id    String   @id @default(uuid()) @db.Uuid
+  user_id String @default(uuid()) @db.Uuid
+  session_token_hash String 
+  status SSOStatus 
+  created_at DateTime @default(now())
+  expires_at DateTime
+  last_activity_at DateTime @default(now())
+  revoked_at DateTime?
+  revoke_reason String?
+  ip_address String?
+  user_agent String?
+
+  user users @relation(fields: [user_id], references: [id])
+}
+
+model authorization_codes {
+  id    String   @id @default(uuid()) @db.Uuid
+  code_hash String @unique
+  user_id String @db.Uuid
+  application_id String @db.Uuid
+  sso_session_id String @db.Uuid
+  redirect_uri String
+  created_at DateTime @default(now())
+  expires_at DateTime
+  used_at DateTime?
+}
+
+
+model access_tokens {
+  id    String   @id @default(uuid()) @db.Uuid
+  jti String @unique
+  user_id String @db.Uuid
+  application_id String @db.Uuid
+  sso_session_id String @db.Uuid
+  scopes String[]
+  status String
+  issued_at DateTime @default(now())
+  expires_at DateTime
+  revoked_at DateTime?
+}
+
+model audit_logs {
+  id   String   @id @default(uuid()) @db.Uuid
+  event_type String 
+  actor_id String? @db.Uuid
+  user_id String? @db.Uuid
+  application_id String? @db.Uuid
+  session_id String? @db.Uuid
+  result Result
+  metadata Json?
+  ip_address String?
+  created_at DateTime @default(now())
+}
