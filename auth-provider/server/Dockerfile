@@ -1,13 +1,16 @@
-FROM python:3.11-slim
+FROM node:22-alpine
 
 WORKDIR /usr/src/app
 
-COPY requirements.txt .
+COPY auth-provider/server/package*.json ./
+RUN npm ci
 
-RUN pip install --no-cache-dir -r requirements.txt
+COPY auth-provider/db/prisma ./prisma/
+RUN npx prisma generate --schema=./prisma/schema.prisma
 
-COPY . .
+COPY auth-provider/server ./
+RUN npm run build
 
-EXPOSE 8000
+EXPOSE 8080
 
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--reload", "app:app"]
+CMD ["npm", "run", "start"]
