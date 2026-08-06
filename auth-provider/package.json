@@ -1,0 +1,8 @@
+{
+  "name": "auth-provider",
+  "private": true,
+  "workspaces": [
+    "control-panel",
+    "db"
+  ]
+}
