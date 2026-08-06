@@ -19,7 +19,8 @@ services:
 
   db-global:
     build: 
-      context: ./auth-provider/db
+      context: .
+      dockerfile: ./auth-provider/db/Dockerfile
     container_name: db-global
     restart: on-failure
     environment:
@@ -28,20 +29,39 @@ services:
       postgres-db:
         condition: service_healthy
 
-  server:
+  control-panel:
     build:
-      context: ./auth-provider/server
-    container_name: server
+      context: .
+      dockerfile: ./auth-provider/control-panel/Dockerfile
+    container_name: control-panel
     restart: always
+    volumes:
+      - /usr/src/app/node_modules
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-db:5432/${POSTGRES_DB}?schema=public
     ports:
-      - "8080:8000"
-    volumes:
-      - ./auth-provider/server:/usr/src/app
-    depends_on:
-      postgres-db:
-        condition: service_healthy
+      - "3000:3000"
+
+  # server:
+  #   build:
+  #     context: .      
+  #     dockerfile: ./auth-provider/server/Dockerfile
+  #   container_name: server
+  #   restart: always
+  #   environment:
+  #     - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-db:5432/${POSTGRES_DB}?schema=public
+  #   ports:
+  #     - "8080:8080"
+  #   volumes:
+  #     - ./auth-provider/server:/usr/src/app
+  #     - ./auth-provider/db:/usr/src/db
+  #     - /usr/src/app/node_modules
+  #     - /usr/src/app/dist
+  #   depends_on:
+  #     postgres-db:
+  #       condition: service_healthy
+  #     db-global:
+  #       condition: service_completed_successfully
 
 volumes:
   db-global-data:
