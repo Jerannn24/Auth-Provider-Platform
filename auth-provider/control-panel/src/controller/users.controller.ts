@@ -1,5 +1,4 @@
-import { prisma } from "../../../db/";
-import { Status } from "../../../db/";
+import { prisma, Status } from "../../../db/";
 
 // Mendapatkan semua user
 export const getAllUsers = async () => {
@@ -50,4 +49,14 @@ export const updateUserStatusById = async (id: string, status: boolean) => {
         data: { status: active },
         select: { id: true, name: true, email: true, status: true, created_at: true }
     });
+}
+
+// Mendapatkan status user
+export const getUserStatusById = async (id: string) => {
+    const user = await prisma.users.findUnique({
+        where: { id },
+        select: { status: true }
+    });
+
+    return user?.status;
 }

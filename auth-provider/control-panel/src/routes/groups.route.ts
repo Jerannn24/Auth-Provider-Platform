@@ -71,4 +71,16 @@ router.route("/groups/:id")
         }
     });
 
+router.route("/groups/:id/users")
+    .get(async (req: Request, res: Response) => {
+        try {
+            const { id } = req.params;
+            const users = await groupController.getUsersByGroupId(String(id));
+
+            res.json(users);
+        } catch (error) {
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    });
+
 export default router;

@@ -35,3 +35,15 @@ export const deleteGroupById = async (id: string) => {
         select: { id: true, name: true, description: true, created_at: true }
     });
 }
+
+export const getUsersByGroupId = async (groupId: string) => {
+    const users_id = await prisma.user_groups.findMany({
+        where: { group_id: groupId },
+        select: { user_id: true }
+    });
+
+    return await prisma.users.findMany({
+        where: { id: { in: users_id.map(ug => ug.user_id) } },
+        select: { id: true, name: true, email: true, status: true, created_at: true }
+    });
+}

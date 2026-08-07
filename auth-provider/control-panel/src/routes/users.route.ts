@@ -76,7 +76,20 @@ router.route("/users/:id")
   });
 
 router.route("/users/:id/status")
-  .put(async (req: Request, res: Response) => {
+  .get(async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const status = await userController.getUserStatusById(String(id));
+
+      if (status === undefined) {
+        return res.status(404).json({ error: 'User tidak ditemukan' });
+      }
+
+      res.json({ status });
+    } catch (error) {
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }).put(async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       const { isActive } = req.body;
