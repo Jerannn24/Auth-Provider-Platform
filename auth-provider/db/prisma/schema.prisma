@@ -102,7 +102,7 @@ model sso_sessions {
   id    String   @id @default(uuid()) @db.Uuid
   user_id String @default(uuid()) @db.Uuid
   session_token_hash String 
-  status SSOStatus 
+  status SSOStatus @default(ACTIVE)
   created_at DateTime @default(now())
   expires_at DateTime
   last_activity_at DateTime @default(now())
@@ -117,6 +117,7 @@ model sso_sessions {
 model authorization_codes {
   id    String   @id @default(uuid()) @db.Uuid
   code_hash String @unique
+  code_challenge String
   user_id String @db.Uuid
   application_id String @db.Uuid
   sso_session_id String @db.Uuid
@@ -126,7 +127,6 @@ model authorization_codes {
   used_at DateTime?
 }
 
-
 model access_tokens {
   id    String   @id @default(uuid()) @db.Uuid
   jti String @unique
@@ -134,7 +134,7 @@ model access_tokens {
   application_id String @db.Uuid
   sso_session_id String @db.Uuid
   scopes String[]
-  status String
+  status SSOStatus @default(ACTIVE)
   issued_at DateTime @default(now())
   expires_at DateTime
   revoked_at DateTime?
