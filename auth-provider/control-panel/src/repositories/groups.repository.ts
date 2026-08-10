@@ -1,4 +1,4 @@
-import { prisma } from "../../../db/";
+import { prisma } from "../../../db";
 
 // Mendapatkan semua group
 export const getAllGroups = async () => {

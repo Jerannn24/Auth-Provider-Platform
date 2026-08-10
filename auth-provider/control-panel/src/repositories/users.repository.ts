@@ -1,4 +1,4 @@
-import { prisma, Status } from "../../../db/";
+import { prisma, Status } from "../../../db";
 
 // Mendapatkan semua user
 export const getAllUsers = async () => {

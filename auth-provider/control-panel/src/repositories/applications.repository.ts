@@ -1,4 +1,4 @@
-import { prisma, Effect } from "../../../db/";
+import { prisma, Effect } from "../../../db";
 
 // Mendapatkan semua aplikasi
 export const getAllApplications = async () => {
