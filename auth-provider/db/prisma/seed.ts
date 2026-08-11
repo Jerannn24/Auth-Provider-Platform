@@ -3,6 +3,7 @@ import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient, Effect, Status} from "../generated/prisma/client";
 import * as bcrypt from "bcrypt";
+import crypto from "crypto";
 
 const SALT_ROUNDS = 10;
 
@@ -63,7 +64,7 @@ async function main() {
         create: {
             name: "AppA",
             client_id: "app-a",
-            client_secret_hash: await hashPassword("app-a-secret"),
+            client_secret_hash: crypto.createHash('sha256').update("app-a-secret").digest('hex'),
             status: Status.ACTIVE,
             logout_notification_url: "http://localhost:3000/logout-notify-app-a",
         }
@@ -105,7 +106,7 @@ async function main() {
         create: {
             name: "AppB",
             client_id: "app-b",
-            client_secret_hash: await hashPassword("app-b-secret"),
+            client_secret_hash: crypto.createHash('sha256').update("app-b-secret").digest('hex'),
             status: Status.ACTIVE,
             logout_notification_url: "http://localhost:3000/logout-notify-app-b",
         }

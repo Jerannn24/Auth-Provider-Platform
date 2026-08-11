@@ -66,7 +66,7 @@ model applications{
   id     String   @id @default(uuid()) @db.Uuid
   name     String   
   client_id String @unique
-  client_secret_hash String? 
+  client_secret_hash String @unique
   status  Status @default(ACTIVE)
   launch_url String?
   logout_notification_url String?
