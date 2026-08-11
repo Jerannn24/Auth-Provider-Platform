@@ -8,6 +8,11 @@ export const validateClientID = async (clientId: string) => {
 
     return client;
 };
+export const getClientBySecret = async (clientSecretHash: string) => {
+    return await prisma.applications.findUnique({
+        where: { client_secret_hash: clientSecretHash },
+    });
+};
 
 export const validateRedirectURI = async (clientId: string, redirectURI: string) => {
     const client = await prisma.applications.findUnique({
@@ -39,4 +44,17 @@ export const createAuthorizationCode = async (userId: string, applicationId: str
                 expires_at: new Date(expiredTime),
             },
         });
+}
+
+export const getAuthorizationCode = async (code_hash: string) => {
+    return await prisma.authorization_codes.findUnique({
+        where: { code_hash: code_hash },
+    });
+}
+
+export const consumeAuthorizationCode = async (id: string) => {
+    return await prisma.authorization_codes.update({
+        where: { id: id },
+        data: { used_at: new Date() },
+    });
 }

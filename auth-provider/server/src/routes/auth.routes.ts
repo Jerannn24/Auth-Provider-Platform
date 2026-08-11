@@ -6,6 +6,9 @@ import { Status, Result } from "../../../db";
 import * as authRepository from "../repositories/auth.repository";
 import * as sessionRepository from "../repositories/session.repository";
 import * as clientRepository from "../repositories/client.repository";
+import * as tokenRepository from "../repositories/token.repository";
+
+import jwt from "jsonwebtoken";
 import { createAuditLogs, updateUserPasswordHash } from "../repositories/utility.repository";
 
 const router = Router();
@@ -293,7 +296,7 @@ router.route("/authorize")
                         }
                     } as any
                 );
-                
+
                 return res.status(500).json({ error: 'Gagal membuat kode otorisasi' });
             }
 
@@ -486,6 +489,190 @@ router.route("/change-password")
 
             res.clearCookie("session_token");
             return res.status(200).json({ message: 'Password berhasil diubah' });
+        } catch (error) {
+            console.error(error);
+            return res.status(500).json({ error: 'Terjadi kesalahan pada server' });
+        }
+    });
+
+router.route("/token")
+    .post(async (req, res) => {
+        try {
+            const { code, code_verifier, client_secret } = req.body;
+
+            if (!code || !code_verifier || !client_secret) {
+                await createAuditLogs(
+                    "TOKEN_REQUEST_FAILED",
+                    Result.FAILURE,
+                    undefined,
+                    undefined,
+                    undefined,
+                    undefined,
+                    {
+                        "ERROR": {
+                            "code": "MISSING_PARAMETERS",
+                            "message": "Parameter yang dibutuhkan tidak lengkap"
+                        }
+                    } as any
+                );
+                return res.status(400).json({ error: 'Parameter yang dibutuhkan tidak lengkap' });
+            }
+
+            const code_hash = crypto.createHash('sha256').update(code).digest('hex');
+            const authorizationCode = await clientRepository.getAuthorizationCode(code_hash);
+
+            if (!authorizationCode) {
+                await createAuditLogs(`TOKEN_REQUEST_FAILED`,
+                    Result.FAILURE,
+                    undefined,
+                    undefined,
+                    undefined,
+                    undefined,
+                    {
+                        "ERROR": {
+                            "code": "INVALID_AUTHORIZATION_CODE",
+                            "message": "Kode otorisasi tidak valid"
+                        }
+                    } as any
+                );
+                return res.status(400).json({ error: 'Kode otorisasi tidak valid' });
+            }
+
+            if (authorizationCode.expires_at < new Date()) {
+                await createAuditLogs(
+                    "TOKEN_REQUEST_FAILED",
+                    Result.FAILURE,
+                    undefined,
+                    undefined,
+                    undefined,
+                    undefined,
+                    {
+                        "ERROR": {
+                            "code": "AUTHORIZATION_CODE_EXPIRED",
+                            "message": "Kode otorisasi telah kedaluwarsa"
+                        }
+                    } as any
+                );
+                return res.status(400).json({ error: 'Kode otorisasi telah kedaluwarsa' });
+            }
+
+            const clientSecretHash = crypto.createHash('sha256').update(client_secret).digest('hex');
+            const client = await clientRepository.getClientBySecret(clientSecretHash);
+
+            if (!client) {
+                await createAuditLogs(
+                    "TOKEN_REQUEST_FAILED",
+                    Result.FAILURE,
+                    undefined,
+                    undefined,
+                    undefined,
+                    undefined,
+                    {
+                        "ERROR": {
+                            "code": "CLIENT_NOT_FOUND",
+                            "message": "Client tidak ditemukan"
+                        }
+                    } as any
+                );
+                return res.status(400).json({ error: 'Client tidak ditemukan' });
+            }
+
+            if (client.client_secret_hash !== clientSecretHash) {
+                await createAuditLogs(
+                    "TOKEN_REQUEST_FAILED",
+                    Result.FAILURE,
+                    undefined,
+                    undefined,
+                    undefined,
+                    undefined,
+                    {
+                        "ERROR": {
+                            "code": "INVALID_CLIENT_SECRET",
+                            "message": "Secret client tidak valid"
+                        }
+                    } as any
+                );
+                return res.status(400).json({ error: 'Secret client tidak valid' });
+            }
+
+            const codeChallenge = crypto.createHash('sha256').update(code_verifier).digest('hex');
+
+            if (codeChallenge !== authorizationCode.code_challenge) {
+                await createAuditLogs(
+                    "TOKEN_REQUEST_FAILED",
+                    Result.FAILURE,
+                    undefined,
+                    undefined,
+                    undefined,
+                    undefined,
+                    {
+                        "ERROR": {
+                            "code": "INVALID_CODE_VERIFIER",
+                            "message": "Code verifier tidak valid"
+                        }
+                    } as any
+                );
+                return res.status(400).json({ error: 'Code verifier tidak valid' });
+            }
+            
+            const token = await tokenRepository.createToken(codeChallenge);
+            
+            if (!token) {
+                await createAuditLogs(
+                    "TOKEN_REQUEST_FAILED",
+                    Result.FAILURE,
+                    undefined,
+                    undefined,
+                    undefined,
+                    undefined,
+                    {
+                        "ERROR": {
+                            "code": "ACCESS_TOKEN_CREATION_FAILED",
+                            "message": "Gagal membuat access token"
+                        }
+                    } as any
+                );
+                return res.status(500).json({ error: 'Gagal membuat access token' });
+            }
+
+            const accessToken = jwt.sign(
+                {
+                    user_id: authorizationCode.user_id,
+                    application_id: authorizationCode.application_id,
+                    sso_session_id: authorizationCode.sso_session_id,
+                    exp: Math.floor(authorizationCode.expires_at.getTime() / 1000),
+                },
+                process.env.JWT_SECRET!,
+                { 
+                    algorithm: 'HS256', 
+                    expiresIn: '1h' 
+                }
+            );
+
+            await createAuditLogs(
+                "TOKEN_REQUEST_SUCCESS",
+                Result.SUCCESS,
+                authorizationCode.user_id,
+                authorizationCode.user_id,
+                client.id,
+                undefined,
+                {
+                    "MESSAGE": {
+                        "code": "ACCESS_TOKEN_CREATED",
+                        "message": "Access token berhasil dibuat"
+                    }
+                } as any
+            );
+
+            await clientRepository.consumeAuthorizationCode(authorizationCode.id);
+
+            return res.status(200).json(
+            { 
+                access_token: accessToken, 
+                token_type: "Bearer", 
+                expires_at: authorizationCode.expires_at 
+            });
+
         } catch (error) {
             console.error(error);
             return res.status(500).json({ error: 'Terjadi kesalahan pada server' });

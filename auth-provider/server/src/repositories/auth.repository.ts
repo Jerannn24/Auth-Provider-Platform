@@ -39,4 +39,3 @@ export const isUserHasAccessToApplication = async (userId: string, applicationId
     return applicationGroups.some(ag => ag.effect === Effect.ALLOW);
 }
 
-
