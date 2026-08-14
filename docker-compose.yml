@@ -6,16 +6,33 @@ services:
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_DB_GLOBAL: ${POSTGRES_DB_GLOBAL}
+      POSTGRES_DB_APPLICATION: ${POSTGRES_DB_APPLICATION}
     ports:
       - "5432:5432"
     volumes:
       - db-global-data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB_GLOBAL}"]
       interval: 3s
       timeout: 3s
       retries: 5
+  # db-application:
+  #   build: 
+  #     context: .
+  #     dockerfile: ./application/db/Dockerfile
+  #   container_name: db-application
+  #   restart: on-failure
+  #   environment:
+  #     - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-db:5432/${POSTGRES_DB_APPLICATION}?schema=public
+  #   depends_on:
+  #     postgres-db:
+  #       condition: service_healthy
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB_APPLICATION}"]
+  #     interval: 3s
+  #     timeout: 3s
+  #     retries: 5
   db-global:
     build: 
       context: .
@@ -23,12 +40,12 @@ services:
     container_name: db-global
     restart: on-failure
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-db:5432/${POSTGRES_DB}?schema=public
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-db:5432/${POSTGRES_DB_GLOBAL}?schema=public
     depends_on:
       postgres-db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB_GLOBAL}"]
       interval: 3s
       timeout: 3s
       retries: 5
@@ -39,9 +56,10 @@ services:
     container_name: control-panel
     restart: always
     volumes:
-      - /usr/src/app/node_modules
+      - ./auth-provider/control-panel:/usr/src/app/control-panel
+      - /usr/src/app/control-panel/node_modules
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-db:5432/${POSTGRES_DB}?schema=public
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-db:5432/${POSTGRES_DB_GLOBAL}?schema=public
     ports:
       - "3000:3000"
     healthcheck:
@@ -49,27 +67,73 @@ services:
       interval: 3s
       timeout: 3s
       retries: 5
-    
-  # server:
-  #   build:
-  #     context: .      
-  #     dockerfile: ./auth-provider/server/Dockerfile
-  #   container_name: server
-  #   restart: always
-  #   environment:
-  #     - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-db:5432/${POSTGRES_DB}?schema=public
-  #   ports:
-  #     - "8080:8080"
-  #   volumes:
-  #     - ./auth-provider/server:/usr/src/app
-  #     - ./auth-provider/db:/usr/src/db
-  #     - /usr/src/app/node_modules
-  #     - /usr/src/app/dist
-  #   depends_on:
-  #     postgres-db:
-  #       condition: service_healthy
-  #     db-global:
-  #       condition: service_completed_successfully
-
+  server:
+    build:
+      context: .      
+      dockerfile: ./auth-provider/server/Dockerfile
+    container_name: server
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-db:5432/${POSTGRES_DB_GLOBAL}?schema=public
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./auth-provider/server:/usr/src/app/server
+      - /usr/src/app/server/node_modules
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      db-global:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB_GLOBAL}"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+  auth-web:
+    build:
+      context: .
+      dockerfile: ./auth-provider/auth-web/Dockerfile
+    container_name: auth-web
+    restart: always
+    env_file:
+    - ./auth-provider/server/.env
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-db:5432/${POSTGRES_DB_GLOBAL}?schema=public
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./auth-provider/auth-web:/usr/src/app/auth-web
+      - /usr/src/app/auth-web/node_modules
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      db-global:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5173/ || exit 1"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+  app-a:
+    build:
+      context: .
+      dockerfile: ./application/app-a/Dockerfile
+    container_name: app-a
+    restart: always
+    env_file:
+    - ./application/app-a/.env
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-db:5432/${POSTGRES_DB_APPLICATION}?schema=public
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3001/ || exit 1"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
 volumes:
   db-global-data:

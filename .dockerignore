@@ -1,4 +1,5 @@
 **/node_modules
+**/.next
 **/dist
 **/build
 
@@ -8,7 +9,7 @@
 .idea
 
 **/*.log
-**/*.env.*
+**/*.env
 
 Dockerfile*
 docker-compose*.yml
