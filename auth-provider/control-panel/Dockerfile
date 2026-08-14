@@ -14,8 +14,6 @@ RUN npx prisma generate --schema=./db/prisma/schema.prisma
 
 WORKDIR /usr/src/app/control-panel
 
-RUN npm run build
-
 EXPOSE 3000
 
 CMD ["npm", "run", "start"]

@@ -16,11 +16,12 @@ export const createApplication = async (name: string, client_id:
     return await prisma.applications.create({
         data: { name, 
             client_id, 
-            application_redirect_uris: 
+            client_secret_hash : crypto.randomUUID(),
+            application_redirect_uris:
                 { create: redirect_uris.map(uri => ({ redirect_uri: uri })) }, 
             launch_url, 
             logout_notification_url },
-        select: { id: true, name: true, client_id: true, launch_url: true, created_at: true }
+        select: { id: true, name: true, client_id: true, client_secret_hash: true, launch_url: true, created_at: true }
     });
 }
 
