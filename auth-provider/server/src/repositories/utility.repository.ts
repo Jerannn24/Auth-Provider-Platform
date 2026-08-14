@@ -1,11 +1,32 @@
+import { JwtPayload } from 'jsonwebtoken';
 import { prisma, Result } from '../../../db'
-import { Prisma } from '@prisma/client'
+import { Prisma, Effect } from '@prisma/client'
+import { group } from 'node:console';
 
-export const getUserInfo = async (userId: string) => {
-    return await prisma.users.findUnique({
-        where: { id: userId },
-        select: { id: true, name: true, email: true, status: true, created_at: true }
+export const getUserInfo = async (decoded: JwtPayload) => {
+    const user = await prisma.users.findUnique({
+        where: { 
+            id: decoded.user_id, 
+        },
+        include: {
+            user_groups: {
+                where: {
+                    group: {
+                        application_group_policies:{
+                            some: {
+                                application_id: decoded.application_id,
+                                effect: Effect.ALLOW,
+                            },
+                        },
+                    },
+                },
+                include: {
+                    group: true,
+                },
+            },
+        },
     });
+    return user;
 }
 
 export const createAuditLogs = 

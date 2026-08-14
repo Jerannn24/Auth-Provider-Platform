@@ -17,7 +17,6 @@ export const createToken = async (code_hash: string) => {
             user_id: authorizationCode?.user_id!,
             application_id: authorizationCode?.application_id!,
             sso_session_id: authorizationCode?.sso_session_id!,
-            session_token_hash: code_hash,
             expires_at: new Date(Date.now() + 60 * 60 * 1000), 
         }
     });

@@ -1,13 +1,13 @@
 import { prisma } from "../../../db";
-import bycrypt from "bcrypt";
 
 export const validateClientID = async (clientId: string) => {
     const client = await prisma.applications.findUnique({
-        where: { id: clientId },
+        where: { client_id: clientId },
     });
 
     return client;
 };
+
 export const getClientBySecret = async (clientSecretHash: string) => {
     return await prisma.applications.findUnique({
         where: { client_secret_hash: clientSecretHash },
@@ -16,7 +16,7 @@ export const getClientBySecret = async (clientSecretHash: string) => {
 
 export const validateRedirectURI = async (clientId: string, redirectURI: string) => {
     const client = await prisma.applications.findUnique({
-        where: { id: clientId },
+        where: { client_id: clientId },
     });
 
     if (!client) {
@@ -24,7 +24,7 @@ export const validateRedirectURI = async (clientId: string, redirectURI: string)
     }
 
     const redirectURIs = await prisma.application_redirect_uris.findMany({
-        where: { application_id: clientId },
+        where: { application_id: client.id },
     });
 
     return redirectURIs.some(uri => uri.redirect_uri === redirectURI);
