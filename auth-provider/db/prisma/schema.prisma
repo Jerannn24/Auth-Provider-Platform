@@ -143,10 +143,10 @@ model access_tokens {
 model audit_logs {
   id   String   @id @default(uuid()) @db.Uuid
   event_type String 
-  actor_id String? @db.Uuid
-  user_id String? @db.Uuid
-  application_id String? @db.Uuid
-  session_id String? @db.Uuid
+  actor_id String?
+  user_id String?
+  application_id String?
+  session_id String?
   result Result
   metadata Json?
   ip_address String?

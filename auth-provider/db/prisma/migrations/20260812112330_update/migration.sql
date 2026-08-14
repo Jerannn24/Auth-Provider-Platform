@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "audit_logs" ALTER COLUMN "actor_id" SET DATA TYPE TEXT,
+ALTER COLUMN "user_id" SET DATA TYPE TEXT,
+ALTER COLUMN "application_id" SET DATA TYPE TEXT,
+ALTER COLUMN "session_id" SET DATA TYPE TEXT;

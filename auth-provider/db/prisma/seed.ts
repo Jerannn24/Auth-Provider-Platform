@@ -66,19 +66,19 @@ async function main() {
             client_id: "app-a",
             client_secret_hash: crypto.createHash('sha256').update("app-a-secret").digest('hex'),
             status: Status.ACTIVE,
-            logout_notification_url: "http://localhost:3000/logout-notify-app-a",
+            logout_notification_url: "http://localhost:3001/logout-notify-app-a",
         }
     });
 
     const redirectUriA = await prisma.application_redirect_uris.findFirst({
         where: {
             application_id: applicationA.id,
-            redirect_uri: "http://localhost:3000/callback-app-a"
+            redirect_uri: "http://localhost:3001/auth/callback"
         }
     }) ?? await prisma.application_redirect_uris.create({
         data: {
             application_id: applicationA.id,
-            redirect_uri: "http://localhost:3000/callback-app-a"
+            redirect_uri: "http://localhost:3001/auth/callback"
         }
     });
 
@@ -108,19 +108,19 @@ async function main() {
             client_id: "app-b",
             client_secret_hash: crypto.createHash('sha256').update("app-b-secret").digest('hex'),
             status: Status.ACTIVE,
-            logout_notification_url: "http://localhost:3000/logout-notify-app-b",
+            logout_notification_url: "http://localhost:3002/logout-notify-app-b",
         }
     });
 
     const redirectUriB = await prisma.application_redirect_uris.findFirst({
         where: {
             application_id: applicationB.id,
-            redirect_uri: "http://localhost:3000/callback-app-b"
+            redirect_uri: "http://localhost:3002/auth/callback"
         }
     }) ?? await prisma.application_redirect_uris.create({
         data: {
             application_id: applicationB.id,
-            redirect_uri: "http://localhost:3000/callback-app-b"
+            redirect_uri: "http://localhost:3002/auth/callback"
         }
     });
 
