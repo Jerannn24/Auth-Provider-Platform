@@ -7,9 +7,11 @@ import * as authRepository from "../repositories/auth.repository";
 import * as sessionRepository from "../repositories/session.repository";
 import * as clientRepository from "../repositories/client.repository";
 import * as tokenRepository from "../repositories/token.repository";
+import * as utilRepository from "../repositories/utility.repository";
 
-import jwt from "jsonwebtoken";
+import jwt, { JwtPayload} from "jsonwebtoken";
 import { createAuditLogs, updateUserPasswordHash } from "../repositories/utility.repository";
+import { decode } from "punycode";
 
 const router = Router();
 
@@ -61,6 +63,7 @@ router.route("/login")
                         }   
                     } as any
                 );
+
                 return res.status(403).json({ error: 'User tidak aktif' });
             }
 
@@ -72,7 +75,8 @@ router.route("/login")
 
             res.cookie('session_token', sessionToken, {
                 httpOnly: true,
-                sameSite: 'strict',
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
                 expires: expiresAt,
             });
 
@@ -116,51 +120,8 @@ router.route("/authorize")
                         }
                     } as any
                 );
-             
+            
                 return res.status(400).json({ error: 'Parameter yang dibutuhkan tidak lengkap' });
-            }
-
-            if (!sessionToken) {
-                await createAuditLogs(
-                    "AUTHORIZE_FAILED",
-                    Result.FAILURE,
-                    undefined,
-                    undefined,
-                    undefined,
-                    String(client_id),
-                    {
-                        "ERROR": {
-                            "code": "NO_SESSION_TOKEN",
-                            "message": "Token sesi tidak ditemukan"
-                        }
-                    } as any
-                );
-                return res.redirect('/login');
-            }
-
-            const sessionTokenHash = crypto.createHash('sha256').update(sessionToken).digest('hex');
-            const session = await sessionRepository.getSessionByToken(sessionTokenHash);
-
-            if (!session) {
-                await createAuditLogs(
-                    "AUTHORIZE_FAILED",
-                    Result.FAILURE,
-                    undefined,
-                    undefined,
-                    undefined,
-                    String(client_id),
-                    {
-                        "ERROR": {
-                            "code": "NO_SESSION",
-                            "message": "Sesi tidak ditemukan"
-                        }
-                    } as any
-                );
-                return res.redirect('/login');
-            }
-
-            if (session.expires_at < new Date()) {
-                return res.redirect('/login');
             }
 
             const client = await clientRepository.validateClientID(String(client_id));
@@ -220,6 +181,49 @@ router.route("/authorize")
                 return res.status(400).json({ error: 'Redirect URI tidak valid' });
             }
 
+            if (!sessionToken) {
+                await createAuditLogs(
+                    "AUTHORIZE_FAILED",
+                    Result.FAILURE,
+                    undefined,
+                    undefined,
+                    undefined,
+                    String(client_id),
+                    {
+                        "ERROR": {
+                            "code": "NO_SESSION_TOKEN",
+                            "message": "Token sesi tidak ditemukan"
+                        }
+                    } as any
+                );
+                return res.redirect(`http://localhost:5173/login?client_id=${client_id}&redirect_uri=${redirect_uri}&state=${state}&code_challenge=${code_challenge}`);
+            }
+
+            const sessionTokenHash = crypto.createHash('sha256').update(sessionToken).digest('hex');
+            const session = await sessionRepository.getSessionByToken(sessionTokenHash);
+
+            if (!session) {
+                await createAuditLogs(
+                    "AUTHORIZE_FAILED",
+                    Result.FAILURE,
+                    undefined,
+                    undefined,
+                    undefined,
+                    String(client_id),
+                    {
+                        "ERROR": {
+                            "code": "NO_SESSION",
+                            "message": "Sesi tidak ditemukan"
+                        }
+                    } as any
+                );
+                return res.redirect(`http://localhost:5173/login?client_id=${client_id}&redirect_uri=${redirect_uri}&state=${state}&code_challenge=${code_challenge}`);
+            }
+
+            if (session.expires_at < new Date()) {
+                return res.redirect(`http://localhost:5173/login?client_id=${client_id}&redirect_uri=${redirect_uri}&state=${state}&code_challenge=${code_challenge}`);
+            }
+
             const user = await authRepository.findUserById(session.user_id);
             if (!user) {
                 await createAuditLogs(
@@ -236,7 +240,7 @@ router.route("/authorize")
                         }
                     } as any
                 );
-                return res.redirect('/login');
+                return res.redirect(`http://localhost:5173/login?client_id=${client_id}&redirect_uri=${redirect_uri}&state=${state}&code_challenge=${code_challenge}`);
             }
 
             const isActive = await authRepository.isActiveUser(user.id);
@@ -258,7 +262,7 @@ router.route("/authorize")
                 return res.status(403).json({ error: 'User tidak aktif' });
             }
 
-            const isUserHasAccess = await authRepository.isUserHasAccessToApplication(user.id, String(client_id));
+            const isUserHasAccess = await authRepository.isUserHasAccessToApplication(user.id, client.id);
             if (!isUserHasAccess) {
                 await createAuditLogs(
                     "AUTHORIZE_FAILED",
@@ -474,7 +478,6 @@ router.route("/change-password")
             await updateUserPasswordHash(user.id, newPasswordHash);
             await sessionRepository.revokeAllSessionsByUserId(user.id);
 
-
             await createAuditLogs(
                 "CHANGE_PASSWORD_SUCCESS",
                 Result.SUCCESS,
@@ -615,7 +618,7 @@ router.route("/token")
                 return res.status(400).json({ error: 'Code verifier tidak valid' });
             }
             
-            const token = await tokenRepository.createToken(codeChallenge);
+            const token = await tokenRepository.createToken(code_hash);
             
             if (!token) {
                 await createAuditLogs(
@@ -637,23 +640,22 @@ router.route("/token")
 
             const accessToken = jwt.sign(
                 {
-                    user_id: authorizationCode.user_id,
-                    application_id: authorizationCode.application_id,
-                    sso_session_id: authorizationCode.sso_session_id,
-                    exp: Math.floor(authorizationCode.expires_at.getTime() / 1000),
+                    user_id: token.user_id,
+                    application_id: token.application_id,
+                    sso_session_id: token.sso_session_id,
+                    exp: Math.floor(token.expires_at.getTime() / 1000),
                 },
                 process.env.JWT_SECRET!,
                 { 
                     algorithm: 'HS256', 
-                    expiresIn: '1h' 
                 }
             );
 
             await createAuditLogs(
                 "TOKEN_REQUEST_SUCCESS",
                 Result.SUCCESS,
-                authorizationCode.user_id,
-                authorizationCode.user_id,
+                token.user_id,
+                token.sso_session_id,
                 client.id,
                 undefined,
                 {
@@ -670,7 +672,35 @@ router.route("/token")
             { 
                 access_token: accessToken, 
                 token_type: "Bearer", 
-                expires_at: authorizationCode.expires_at 
+                expires_at: token.expires_at
+            });
+
+        } catch (error) {
+            console.error(error);
+            return res.status(500).json({ error: 'Terjadi kesalahan pada server' });
+        }
+    });
+
+router.route("/userinfo")
+    .get(async (req, res) => {
+        try {
+            const authHeader = req.headers.authorization;
+            if (!authHeader || !authHeader.startsWith('Bearer ')) {
+                return res.status(401).json({ error: 'Unauthorized' });
+            }
+
+            const token = authHeader.split(' ')[1];
+            const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload;
+            
+            const userInfo = await utilRepository.getUserInfo(decoded);
+
+            return res.status(200).json({ 
+                sub: userInfo?.id,
+                email: userInfo?.email,
+                name: userInfo?.name,
+                groups: userInfo?.user_groups.map(ug => ug.group.name) ?? [],
+                session_id: decoded.sso_session_id,
+                application_id: decoded.application_id,
             });
 
         } catch (error) {
@@ -681,6 +711,3 @@ router.route("/token")
 
 
 export default router;
-
-
-
