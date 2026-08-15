@@ -1,21 +1,13 @@
-import { cookies } from "next/headers";
+import { getSession } from "@/repositories/local.session.repository";
 import { redirect } from "next/navigation";
+import ActivityLogItems from "./_component/activity-log";
+import LoginButton from "./_component/login-button";
 
 export default async function Page() {
-    const cookieStore = await cookies();
-
-    const sessionToken =
-        cookieStore.get("session_token")?.value;
-
-    if (sessionToken) {
+    const session = await getSession();
+    if (session) {
         redirect("/dashboard");
+    }else{
+        redirect("/login");
     }
-
-    return (
-        <form action="/login">
-            <button type="submit">
-                Login
-            </button>
-        </form>
-    );
 }

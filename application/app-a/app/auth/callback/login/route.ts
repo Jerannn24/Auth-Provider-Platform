@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { cookies } from "next/dist/server/request/cookies";
+import * as activityLogRepository from "../../../../repositories/local.log.repository";
 
 export async function GET() {
     const cookiesStore = await cookies();
+    const existCorrelationId = cookiesStore.get("correlation")?.value;
+    const correlation_id = existCorrelationId || crypto.randomUUID();
 
     if (cookiesStore.get("session_token")) {
         return NextResponse.redirect("http://localhost:3001/dashboard");
@@ -30,5 +33,12 @@ export async function GET() {
         sameSite: "lax",
     });
 
+    cookiesStore.set("correlation", correlation_id, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+    });
+
+    await activityLogRepository.createActivityLog(correlation_id, "LOGIN_INITIATED", "SUCCESS", { message: "Login initiated" });
     return NextResponse.redirect(redirectUrl);
 }
