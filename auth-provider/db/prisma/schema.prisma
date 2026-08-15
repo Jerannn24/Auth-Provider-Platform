@@ -39,7 +39,6 @@ model users {
   user_groups user_groups[]
   sso_sessions sso_sessions[]
 }
-
 model groups {
   id      String   @id @default(uuid()) @db.Uuid
   name     String   @unique
