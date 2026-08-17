@@ -11,3 +11,17 @@ export const getAllLocalEvent = async function () {
         return null;
     }
 }
+
+export const createLocalEvent = async function (payload: any) {
+    try{
+        return await prisma.processed_events.create({
+            data: {
+                event_id: payload.event_id,
+                event_type: payload.event_type,
+                result: "All local session revoked"
+            }
+        })
+    } catch (error) {
+        return null;
+    }
+}

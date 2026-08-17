@@ -64,6 +64,58 @@ export const expiredLocalSession = async function (session_token_hash: string) {
 }
 
 
+export const revokedAllSessionBySSOSessionId = async function (central_session_id: string, reason: string) {
+    try {
+        return await prisma.local_sessions.updateMany({
+            where: {
+                central_session_id: central_session_id,
+                status: SSOStatus.ACTIVE
+            },
+            data: {
+                status: SSOStatus.REVOKED,
+                revoked_at: new Date(),
+                revoke_reason: reason
+            }
+        });
+    }
+    catch (error) {
+        return null;
+    }
+}
+
+export const revokeAllSessionsByUserId = async function (user_id: string, reason: string) {
+    try {
+        return await prisma.local_sessions.updateMany({
+            where: {
+                external_user_id: user_id,
+                status: SSOStatus.ACTIVE
+            },
+            data: {
+                status: SSOStatus.REVOKED,
+                revoked_at: new Date(),
+                revoke_reason: reason
+            }
+        });
+    }
+    catch (error) {
+        return null;
+    }
+}
+
+export const getLocalSessionBySSOSessionId = async function (central_session_id: string) {
+    try {
+        return await prisma.local_sessions.findFirst({
+            where: {
+                central_session_id: central_session_id,
+                status: SSOStatus.ACTIVE
+            }
+        });
+    }
+    catch (error) {
+        return null;
+    }
+}
+
 export const getSession = async function () {
     const cookiesStore = await cookies();
     const sessionToken = cookiesStore.get("session_token")?.value;
