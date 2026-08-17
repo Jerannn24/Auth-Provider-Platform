@@ -2,8 +2,7 @@ import { Router, Request, Response } from 'express';
 
 import * as groupRepository from '../repositories/groups.repository';
 import { createAuditLogs } from '../../../server/src/repositories/utility.repository';
-import * as sessionRepositories from '../../../server/src/repositories/session.repository';
-import { Result } from '../../../db';
+import { Result, prisma } from '../../../db';
 
 const router = Router();
 
@@ -114,7 +113,6 @@ router.route("/groups/:id")
             const updatedGroup = await groupRepository.updateGroupById(String(id), name, description);
 
             if (!updatedGroup) {
-
                 await createAuditLogs(
                     "UPDATE_GROUP_FAILED",
                     Result.FAILURE,
@@ -202,7 +200,7 @@ router.route("/groups/:id/users")
         try {
             const { id } = req.params;
             const users = await groupRepository.getUsersByGroupId(String(id));
-
+        
             res.json(users);
         } catch (error) {
             res.status(500).json({ error: 'Internal server error' });

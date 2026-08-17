@@ -60,3 +60,103 @@ export const getUserStatusById = async (id: string) => {
 
     return user?.status;
 }
+
+export async function getUsersWithoutAccess(applicationId: string) {
+  // 1. Ambil semua policy terdaftar untuk aplikasi ini
+  const policies = await prisma.application_group_policies.findMany({
+    where: { application_id: applicationId },
+  });
+
+  const allowedGroupIds = policies
+    .filter((p) => p.effect === "ALLOW")
+    .map((p) => p.group_id);
+
+  const deniedGroupIds = policies
+    .filter((p) => p.effect === "DENY")
+    .map((p) => p.group_id);
+
+  // 2. Query user yang TIDAK memiliki akses
+  const usersWithoutAccess = await prisma.users.findMany({
+    where: {
+      OR: [
+        // Kondisi A: Status user Non-Aktif
+        { status: "INACTIVE" },
+
+        // Kondisi B: User masuk ke salah satu grup yang di-DENY
+        {
+          user_groups: {
+            some: {
+              group_id: { in: deniedGroupIds },
+            },
+          },
+        },
+
+        // Kondisi C: User TIDAK masuk ke salah satu pun grup yang di-ALLOW
+        {
+          user_groups: {
+            none: {
+              group_id: { in: allowedGroupIds },
+            },
+          },
+        },
+      ],
+    },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      status: true,
+    },
+  });
+
+  return usersWithoutAccess;
+}
+
+export async function getUserIdsWithoutAccess(applicationId: string): Promise<string[]> {
+  const policies = await prisma.application_group_policies.findMany({
+    where: { application_id: applicationId },
+  });
+
+  const allowedGroupIds = policies
+    .filter((p) => p.effect === "ALLOW")
+    .map((p) => p.group_id);
+
+  const deniedGroupIds = policies
+    .filter((p) => p.effect === "DENY")
+    .map((p) => p.group_id);
+
+  const usersWithoutAccess = await prisma.users.findMany({
+    where: {
+      OR: [
+        { status: Status.INACTIVE },
+        { user_groups: { some: { group_id: { in: deniedGroupIds } } } },
+        { user_groups: { none: { group_id: { in: allowedGroupIds } } } },
+      ],
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  return usersWithoutAccess.map((user) => user.id);
+}
+
+export async function getUserIdsToRevoke(applicationId: string): Promise<string[]> {
+  const targetUserIds = await getUserIdsWithoutAccess(applicationId);
+
+  if (targetUserIds.length === 0) return [];
+
+  const activeTokens = await prisma.access_tokens.findMany({
+    where: {
+      application_id: applicationId,
+      status: "ACTIVE",
+      user_id: { in: targetUserIds },
+    },
+    select: {
+      user_id: true,
+    },
+    distinct: ["user_id"],
+  });
+
+  return activeTokens.map((token) => token.user_id);
+}
