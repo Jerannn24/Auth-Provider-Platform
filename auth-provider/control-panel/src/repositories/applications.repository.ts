@@ -68,3 +68,4 @@ export const getPoliciesByApplicationId = async (applicationId: string) => {
         }, effect: true }
     });
 }
+

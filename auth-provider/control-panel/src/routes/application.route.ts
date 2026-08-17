@@ -1,16 +1,16 @@
 import { Router, Request, Response } from 'express';
 
-import * as appllicationRepository from '../repositories/applications.repository';
+import * as applicationRepository from '../repositories/applications.repository';
+import * as userRepository from '../repositories/users.repository'
 import { createAuditLogs } from '../../../server/src/repositories/utility.repository';
-import * as sessionRepositories from '../../../server/src/repositories/session.repository';
-import { Result } from '../../../db';
+import { prisma, Result } from '../../../db';
 
 const router = Router();
 
 router.route("/applications")
     .get(async (req: Request, res: Response) => {
         try {
-            const applications = await appllicationRepository.getAllApplications();
+            const applications = await applicationRepository.getAllApplications();
             res.json(applications);
         } catch (error) {
             res.status(500).json({ error: 'Internal server error' });
@@ -18,7 +18,7 @@ router.route("/applications")
     }).post(async (req: Request, res: Response) => {
         try {
             const { name, client_id, redirect_uris, launch_url, logout_notification_url } = req.body;
-            const application = await appllicationRepository.createApplication(name, client_id, redirect_uris, launch_url, logout_notification_url);
+            const application = await applicationRepository.createApplication(name, client_id, redirect_uris, launch_url, logout_notification_url);
 
             if (!application) {
                 await createAuditLogs(
@@ -65,7 +65,7 @@ router.route("/applications/:id/groups")
             const { id } = req.params;
             const { groupId, effect } = req.body;
             
-            const result = await appllicationRepository.addGroupsToApplication(String(id), groupId, effect);
+            const result = await applicationRepository.addGroupsToApplication(String(id), groupId, effect);
 
             if (!result) {
                 await createAuditLogs(
@@ -110,7 +110,7 @@ router.route("/applications/:id/groups")
             const { id } = req.params;
             const { groupId } = req.body;
 
-            const result = await appllicationRepository.deleteGroupsFromApplication(String(id), groupId);
+            const result = await applicationRepository.deleteGroupsFromApplication(String(id), groupId);
 
             if (!result) {
                 await createAuditLogs(
@@ -171,12 +171,40 @@ router.route("/applications/:id/groups")
             const { id } = req.params;
             const { groupId, effect } = req.body;
 
-            const result = await appllicationRepository.updateGroupsInApplication(String(id), groupId, effect);
+            const result = await applicationRepository.updateGroupsInApplication(String(id), groupId, effect);
 
             if (!result) {
                 return res.status(400).json({ error: 'Gagal memperbarui effect group dalam aplikasi' });
             }
+            const effectedUser = await userRepository.getUserIdsToRevoke(String(id));
+            
+            for(const user of effectedUser){
+                await prisma.$transaction(async (tx) => {
+                const eventId = crypto.randomUUID();
+                await tx.events.create({
+                    data: {
+                        id: eventId,
+                        event_type: 'AccessPolicyChanged',
+                        user_id: user,
+                        central_session_id: null,
+                        application_id: String(id), 
+                        payload: {
+                            event_id: eventId,
+                            event_type: 'AccessPolicyChanged',
+                            user_id: user,
+                            sso_session_id: null,
+                            application_id: String(id),
+                            reason: 'change_policy',
+                            occured_at: new Date().toISOString(),
+                            metadata: {}
+                        },
+                        status: 'PENDING'
+                    }
+                });
+            });
 
+
+            }
             res.status(200).json({ message: 'Effect group berhasil diperbarui dalam aplikasi' });
         } catch (error) {
             res.status(400).json({ error: 'Gagal memperbarui effect group dalam aplikasi' });
@@ -187,7 +215,7 @@ router.route("/applications/:id/policies")
     .get(async (req: Request, res: Response) => {
         try {
             const { id } = req.params;
-            const policies = await appllicationRepository.getPoliciesByApplicationId(String(id));
+            const policies = await applicationRepository.getPoliciesByApplicationId(String(id));
 
             res.json(policies);
         } catch (error) {
