@@ -151,3 +151,27 @@ model audit_logs {
   ip_address String?
   created_at DateTime @default(now())
 }
+
+model events{
+  id String @id @default(uuid()) @db.Uuid
+  event_type String
+  user_id String
+  central_session_id String?
+  application_id String?
+  payload Json
+  status String
+  created_at DateTime @default(now())
+  published_at DateTime?
+}
+
+model event_deliveries{
+  id String @id @default(uuid()) @db.Uuid
+  event_id String @db.Uuid
+  application_id String @db.Uuid
+  status String
+  attempt_count Int @default(0)
+  last_attempt_at DateTime?
+  next_retry_at DateTime?
+  processed_at DateTime?
+  last_error String?
+}

@@ -30,6 +30,32 @@ async function main() {
             status: Status.ACTIVE
         }
     });
+    
+    const userA = await prisma.users.upsert({
+        where: {
+            email: "usera@usera.com"
+        },
+        update: {},
+        create: {
+            name: "usera",
+            password_hash: await hashPassword("usera"),
+            email: "usera@usera.com",
+            status: Status.ACTIVE
+        }
+    });
+
+    const userB = await prisma.users.upsert({
+        where: {
+            email: "userb@userb.com"
+        },
+        update: {},
+        create: {
+            name: "userb",
+            password_hash: await hashPassword("userb"),
+            email: "userb@userb.com",
+            status: Status.ACTIVE
+        }
+    });
 
     const group = await prisma.groups.upsert({
         where: {
@@ -39,6 +65,28 @@ async function main() {
         create: {
             name: "admin",
             description: "Administrator group"
+        }
+    });
+
+    const groupA = await prisma.groups.upsert({
+        where: {
+            name: "group-a"
+        },
+        update: {},
+        create: {
+            name: "group-a",
+            description: "Group A"
+        }
+    });
+
+    const groupB = await prisma.groups.upsert({
+        where: {
+            name: "group-b"
+        },
+        update: {},
+        create: {
+            name: "group-b",
+            description: "Group B"
         }
     });
 
@@ -56,6 +104,34 @@ async function main() {
         }
     });
 
+    const userGroupA = await prisma.user_groups.upsert({
+        where: {
+            user_id_group_id: {
+                user_id: userA.id,
+                group_id: groupA.id
+            }
+        },
+        update: {},
+        create: {
+            user_id: userA.id,
+            group_id: groupA.id
+        }
+    });
+
+    const userGroupB = await prisma.user_groups.upsert({
+        where: {
+            user_id_group_id: {
+                user_id: userB.id,
+                group_id: groupB.id
+            }
+        },
+        update: {},
+        create: {
+            user_id: userB.id,
+            group_id: groupB.id
+        }
+    });
+
     const applicationA = await prisma.applications.upsert({
         where: {
             client_id: "app-a"
@@ -66,7 +142,7 @@ async function main() {
             client_id: "app-a",
             client_secret_hash: crypto.createHash('sha256').update("app-a-secret").digest('hex'),
             status: Status.ACTIVE,
-            logout_notification_url: "http://localhost:3001/logout-notify-app-a",
+            logout_notification_url: "http://app-a:3001/internal/logout",
         }
     });
 
@@ -82,7 +158,7 @@ async function main() {
         }
     });
 
-    const policyA = await prisma.application_group_policies.upsert({
+    const policyAdminA = await prisma.application_group_policies.upsert({
         where: {
             application_id_group_id_effect: {
                 application_id: applicationA.id,
@@ -98,6 +174,22 @@ async function main() {
         }
     });
 
+    const policyGroupA = await prisma.application_group_policies.upsert({
+        where: {
+            application_id_group_id_effect: {
+                application_id: applicationA.id,
+                group_id: groupA.id,
+                effect: Effect.ALLOW
+            }
+        },
+        update: {},
+        create: {
+            application_id: applicationA.id,
+            group_id: groupA.id,
+            effect: Effect.ALLOW
+        }
+    });
+
     const applicationB = await prisma.applications.upsert({
         where: {
             client_id: "app-b"
@@ -108,7 +200,7 @@ async function main() {
             client_id: "app-b",
             client_secret_hash: crypto.createHash('sha256').update("app-b-secret").digest('hex'),
             status: Status.ACTIVE,
-            logout_notification_url: "http://localhost:3002/logout-notify-app-b",
+            logout_notification_url: "http://app-a:3002/internal/logout",
         }
     });
 
@@ -124,7 +216,7 @@ async function main() {
         }
     });
 
-    const policyB = await prisma.application_group_policies.upsert({
+    const policyAdminB = await prisma.application_group_policies.upsert({
         where: {
             application_id_group_id_effect: {
                 application_id: applicationB.id,
@@ -136,6 +228,22 @@ async function main() {
         create: {
             application_id: applicationB.id,
             group_id: group.id,
+            effect: Effect.ALLOW
+        }
+    });
+
+    const policyGroupB = await prisma.application_group_policies.upsert({
+        where: {
+            application_id_group_id_effect: {
+                application_id: applicationB.id,
+                group_id: groupB.id,
+                effect: Effect.ALLOW
+            }
+        },
+        update: {},
+        create: {
+            application_id: applicationB.id,
+            group_id: groupB.id,
             effect: Effect.ALLOW
         }
     });
