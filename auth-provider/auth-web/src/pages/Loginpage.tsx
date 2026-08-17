@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Navigate, redirect } from "react-router-dom";
 
 
 export default function LoginPage() {
@@ -59,18 +60,7 @@ export default function LoginPage() {
     };
 
     if (!params.has("client_id") || !params.has("redirect_uri")) {
-        return (
-            <div className="min-h-screen flex items-center justify-center p-4">
-                <div className="bg-white rounded-2xl shadow-2xl p-8">
-                    <h1 className="text-2xl font-bold text-gray-900">
-                        Invalid Request
-                    </h1>
-                    <p className="mt-2 text-gray-500">
-                        Missing required parameters.
-                    </p>
-                </div>
-            </div>
-        );
+        return <Navigate to="/logout" replace />;
     }
 
     return (
