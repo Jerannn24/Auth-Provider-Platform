@@ -119,5 +119,18 @@ services:
       interval: 3s
       timeout: 3s
       retries: 5
+  sync-worker:
+    build:
+      context: .
+      dockerfile: ./auth-provider/sync-worker/Dockerfile
+    container_name: sync-worker
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-db:5432/${POSTGRES_DB_GLOBAL}?schema=public
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      db-global:
+        condition: service_completed_successfully
 volumes:
   db-global-data:
