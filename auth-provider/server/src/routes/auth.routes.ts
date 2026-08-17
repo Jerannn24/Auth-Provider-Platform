@@ -1,7 +1,7 @@
 import { Router, application, request, response } from "express";
 import crypto from "crypto";
 import bcrypt from "bcrypt";
-import { Status, Result } from "../../../db";
+import { SSOStatus, Result, prisma } from "../../../db";
 
 import * as authRepository from "../repositories/auth.repository";
 import * as sessionRepository from "../repositories/session.repository";
@@ -11,7 +11,6 @@ import * as utilRepository from "../repositories/utility.repository";
 
 import jwt, { JwtPayload} from "jsonwebtoken";
 import { createAuditLogs, updateUserPasswordHash } from "../repositories/utility.repository";
-import { decode } from "punycode";
 
 const router = Router();
 
@@ -368,7 +367,34 @@ router.route("/logout")
                 return res.status(400).json({ error: 'Sesi tidak ditemukan' });
             }
 
-            await sessionRepository.updateSessionByToken(sessionTokenHash);
+            await prisma.$transaction(async (tx) => {
+                await tx.sso_sessions.update({
+                    where: { id: session.id },
+                    data: { status: SSOStatus.REVOKED, revoked_at: new Date(), revoke_reason: 'sso_logout' }
+                });
+
+                const eventId = crypto.randomUUID();
+                await tx.events.create({
+                    data: {
+                        id: eventId,
+                        event_type: 'SessionRevoked',
+                        user_id: session.user_id,
+                        central_session_id: session.id,
+                        application_id: null, 
+                        payload: {
+                            event_id: eventId,
+                            event_type: 'SessionRevoked',
+                            user_id: session.user_id,
+                            sso_session_id: session.id,
+                            application_id: null,
+                            reason: 'sso_logout',
+                            occured_at: new Date().toISOString(),
+                            metadata: {}
+                        },
+                        status: 'PENDING'
+                    }
+                });
+            });
 
             res.clearCookie('session_token');
 
@@ -394,49 +420,9 @@ router.route("/logout")
 router.route("/change-password")
     .post(async (req, res) => {
         try {
-            const sessionToken = req.cookies.session_token;
-            const { oldPassword, newPassword } = req.body;
+            const { email, oldPassword, newPassword } = req.body;
 
-            if (!sessionToken) {
-                await createAuditLogs(
-                    "CHANGE_PASSWORD_FAILED",
-                    Result.FAILURE,
-                    undefined,
-                    undefined,
-                    undefined,
-                    undefined,
-                    {
-                        "ERROR": {
-                            "code": "NO_SESSION_TOKEN",
-                            "message": "Token sesi tidak ditemukan"
-                        }
-                    } as any
-                );
-                return res.status(400).json({ error: 'Token sesi tidak ditemukan' });
-            }
-
-            const sessionTokenHash = crypto.createHash('sha256').update(sessionToken).digest('hex');
-            const session = await sessionRepository.getSessionByToken(sessionTokenHash);
-
-            if (!session) {
-                await createAuditLogs(
-                    "CHANGE_PASSWORD_FAILED",
-                    Result.FAILURE,
-                    undefined,
-                    undefined,
-                    undefined,
-                    undefined,
-                    {
-                        "ERROR": {
-                            "code": "NO_SESSION",
-                            "message": "Sesi tidak ditemukan"
-                        }
-                    } as any
-                );
-                return res.status(400).json({ error: 'Sesi tidak ditemukan' });
-            }
-
-            const user = await authRepository.findUserById(session.user_id);
+            const user = await authRepository.findUserByEmail(email);
             if (!user) {
                 await createAuditLogs(
                     "CHANGE_PASSWORD_FAILED",
@@ -476,7 +462,35 @@ router.route("/change-password")
 
             const newPasswordHash = await bcrypt.hash(newPassword, 10);
             await updateUserPasswordHash(user.id, newPasswordHash);
-            await sessionRepository.revokeAllSessionsByUserId(user.id);
+            
+            await prisma.$transaction(async (tx) => {
+                await tx.sso_sessions.updateMany({
+                    where: { user_id: user.id },
+                    data: { status: SSOStatus.REVOKED, revoked_at: new Date(), revoke_reason: 'change_account_password' }
+                });
+
+                const eventId = crypto.randomUUID();
+                await tx.events.create({
+                    data: {
+                        id: eventId,
+                        event_type: 'PasswordChanged',
+                        user_id: user.id,
+                        central_session_id: null,
+                        application_id: null, 
+                        payload: {
+                            event_id: eventId,
+                            event_type: 'PasswordChanged',
+                            user_id: user.id,
+                            sso_session_id: user.id,
+                            application_id: null,
+                            reason: 'change_account_password',
+                            occured_at: new Date().toISOString(),
+                            metadata: {}
+                        },
+                        status: 'PENDING'
+                    }
+                });
+            }); 
 
             await createAuditLogs(
                 "CHANGE_PASSWORD_SUCCESS",
@@ -484,13 +498,12 @@ router.route("/change-password")
                 user.id,
                 user.id,
                 undefined,
-                session.id,
+                undefined,
                 {
                     message: "Password berhasil diubah"
                 } as any
             );
 
-            res.clearCookie("session_token");
             return res.status(200).json({ message: 'Password berhasil diubah' });
         } catch (error) {
             console.error(error);
@@ -708,6 +721,5 @@ router.route("/userinfo")
             return res.status(500).json({ error: 'Terjadi kesalahan pada server' });
         }
     });
-
 
 export default router;
