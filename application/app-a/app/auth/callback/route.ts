@@ -9,7 +9,12 @@ import * as activityLogRepository from "../../../repositories/local.log.reposito
 async function createFailActivityLog(correlation_id: string, state: string, metadata: any) {
     await activityLogRepository.createActivityLog(correlation_id, state, "FAILURE", metadata);
     
-    return NextResponse.redirect('http://localhost:3001/auth/login');
+    const cookiesStore = await cookies();
+    cookiesStore.delete("session_token");
+    cookiesStore.delete("code_verifier");
+    cookiesStore.delete("state");
+
+    return NextResponse.redirect('http://localhost:3001/');
 } 
 
 export async function GET(request: Request) {
