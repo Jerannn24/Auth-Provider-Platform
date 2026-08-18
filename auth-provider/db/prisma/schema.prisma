@@ -36,6 +36,9 @@ model users {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
+  mfa_enabled   Boolean  @default(false)
+  mfa_secret    String?  
+
   user_groups user_groups[]
   sso_sessions sso_sessions[]
 }
