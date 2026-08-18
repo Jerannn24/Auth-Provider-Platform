@@ -1,11 +1,12 @@
 import { prisma } from "../../../db";
 
-export const createSession = async (userId: string, sessionTokenHash: string, expiresAt: Date) => {
+export const createSession = async (userId: string, sessionTokenHash: string, expiresAt: Date, ip_address: string) => {
     return await prisma.sso_sessions.create({
         data: {
             user_id: userId,
             session_token_hash: sessionTokenHash,
             expires_at: expiresAt,
+            ip_address: ip_address
         },
     });
 }

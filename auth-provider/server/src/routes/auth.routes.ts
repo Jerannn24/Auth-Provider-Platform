@@ -11,6 +11,7 @@ import * as utilRepository from "../repositories/utility.repository";
 
 import jwt, { JwtPayload} from "jsonwebtoken";
 import { createAuditLogs, updateUserPasswordHash } from "../repositories/utility.repository";
+import {createCentralSessionAndRespond} from "../services/session.service"
 
 const router = Router();
 
@@ -66,32 +67,7 @@ router.route("/login")
                 return res.status(403).json({ error: 'User tidak aktif' });
             }
 
-            const sessionToken = crypto.randomBytes(32).toString('hex');
-            const sessionTokenHash = crypto.createHash('sha256').update(sessionToken).digest('hex');
-            const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); 
-
-            const session = await sessionRepository.createSession(user.id, sessionTokenHash, expiresAt);
-
-            res.cookie('session_token', sessionToken, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'lax',
-                expires: expiresAt,
-            });
-
-            await createAuditLogs(
-                "LOGIN_SUCCESS",
-                Result.SUCCESS,
-                user.id,
-                user.id,
-                undefined,
-                session.id,
-                {
-                    email: user.email
-                } as any
-            );
-
-            return res.status(200).json({ message: 'Login berhasil' });
+            return createCentralSessionAndRespond(user.id, req, res);
         } catch (error) {
             console.error(error);
             return res.status(500).json({ error: 'Terjadi kesalahan pada server' });
