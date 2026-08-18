@@ -63,8 +63,33 @@ router.route("/login")
                         }   
                     } as any
                 );
-
+                
                 return res.status(403).json({ error: 'User tidak aktif' });
+            }
+
+            if (user.mfa_enabled) {
+                await createAuditLogs(
+                    'LOGIN_MFA_REQUIRED',
+                    Result.SUCCESS,
+                    undefined,
+                    user.id,
+                    undefined,
+                    undefined,
+                    {
+                        "MESSAGE": {
+                            "code": "MFA_REQUIRED",
+                            "message": "MFA diperlukan untuk login"
+                        }
+                    } as any
+                );
+
+                const mfaPendingToken = jwt.sign(
+                    { sub: user.id, purpose: "mfa_pending" },
+                    process.env.JWT_SECRET!,
+                    { expiresIn: "5m" }
+                );
+
+                return res.status(200).json({ mfa_required: true, mfa_pending_token: mfaPendingToken });
             }
 
             return createCentralSessionAndRespond(user.id, req, res);
