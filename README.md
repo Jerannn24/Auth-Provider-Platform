@@ -23,6 +23,7 @@ Sistem manajemen identitas terpusat, penyedia layanan otentikasi (Auth Provider)
 | **Frontend Framework** | React + Vite / Next.js | `v19.2.8` / `v16.3.0` |
 | **Containerization** | Docker & Docker Compose | latest |
 | **Security & Cryptography** | `bcrypt`, `crypto`, `jsonwebtoken` | Latest |
+| **Observability & Metrics** | `prom-client` & Recharts | Prometheus metrics collector & Chart visualization |
 
 ---
 
@@ -71,7 +72,6 @@ Sistem manajemen identitas terpusat, penyedia layanan otentikasi (Auth Provider)
 * **Central SSO Session (`session_token`):** Menggunakan **Opaque Token** (string acak 32-byte dari `crypto.randomBytes`) yang di-hash dengan **SHA-256** sebelum disimpan di database (`sso_sessions`).
 * *Konsekuensi:* Mengorbankan sedikit performa karena memerlukan I/O database pada setiap verifikasi sesi, tetapi memberikan **kontrol pencabutan akses seketika (*instant revocation*)** di seluruh jaringan aplikasi SSO.
 
-
 * **Access Token:** Menggunakan **Opaque JTI / Token Hash** yang terikat pada `application_id`, `user_id`, dan `sso_session_id`.
 * *Konsekuensi:* Memudahkan validasi status aktif (`ACTIVE` vs `REVOKED`) di tingkat aplikasi.
 
@@ -82,7 +82,7 @@ Sistem manajemen identitas terpusat, penyedia layanan otentikasi (Auth Provider)
 
 ### C. Autentikasi Service-to-Service (`/internal/logout`)
 
-* **Keputusan:** Menggunakan **Internal Service Secret (HMAC SHA-256 Signature / Shared Secret Header)** pada panggilan webhook antara `sync-worker` dan endpoint client.
+* **Keputusan:** Menggunakan **Internal Service Secret (HMAC SHA-256 Signature / Shared Secret Header)** pada panggilan webhook yang disimpan di database antara `sync-worker` dan endpoint client.
 * **Alasan:** Memastikan bahwa endpoint pencabutan sesi lokal hanya menerima perintah resmi dari `sync-worker` dan menolak request dari pihak luar.
 
 ### D. Pilihan Soft-Delete vs Hard-Delete
@@ -92,6 +92,7 @@ Sistem manajemen identitas terpusat, penyedia layanan otentikasi (Auth Provider)
 
 ---
 
+### E. Metrics RED 
 ## 5. Cara Menjalankan Sistem
 
 ### Langkah 1: Persiapan Environment
@@ -112,16 +113,6 @@ docker compose up -d --build
 
 ```
 
-### Langkah 3: Jalankan Database Migration & Seed Data
-
-Eksekusi Prisma Migration dan seeder data awal dari container backend:
-
-```bash
-docker compose exec backend npx prisma migrate dev --name init
-docker compose exec backend npx prisma db seed
-
-```
-
 ### URL Akses Tiap Komponen
 
 | Komponen | Endpoint / URL | Keterangan |
@@ -135,8 +126,8 @@ docker compose exec backend npx prisma db seed
 
 ---
 
-## 6. Daftar Endpoint API
-
+## 6. Daftar Endpoint API dan Page
+## 6.1. API
 ### OAuth2 / SSO Engine
 `PORT: 8080`
 * `GET /authorize` - Endpoint otorisasi OAuth2 (menerbitkan *authorization code*).
@@ -145,6 +136,8 @@ docker compose exec backend npx prisma db seed
 * `POST /change-password` - Mengubah password user dan me-revoked session user terkait
 * `POST /token` - Menerbitkan access token dengan jwt code
 * `GET /userinfo` - Endpoint yang digunakan untuk mengambil data user
+* `GET /health/live` - Memeriksa Liveness Auth Server
+* `GET /health/ready` - Memeriksa Readiness Auth Server
 
 ### Control Panel Admin
 `PORT 3000`
@@ -173,6 +166,10 @@ docker compose exec backend npx prisma db seed
 * `GET /users/:id/status` - Melihat status user berdasarkan ID
 * `PUT /users/:id/status` - mengubah status user berdasarkan ID
 
+#### Health Route
+* `GET /health/live` - Memeriksa Liveness Auth Server
+* `GET /health/ready` - Memeriksa Readiness Auth Server
+
 ### Application Route
 `PORT: 3001 (appA) & 3002(appB)`
 
@@ -180,7 +177,61 @@ docker compose exec backend npx prisma db seed
 
 ---
 
+### Sync Worker Health
+`PORT: 9090`
+
+* `GET /health/live` - Memeriksa Liveness Auth Server
+* `GET /health/ready` - Memeriksa Readiness Auth Server
+
+## 6.2. PAGE
+### Auth Provider WebApp
+`PORT: 5173`
+
+* `/login` - Page Login yang hanya bisa dimasuki apabila parameter yang diberikan benar
+* `/logout` - Page untuk melakukan logout terhadap seluruh session yang ada
+* `/change-password` - Page untuk mengubah password suatu akun
+* `/metrics` - Page untuk melihat metrics RED 
+
+### App A & App B
+`PORT: 3001 (appA) & 3002(appB)`
+
+* `/login` - Page untuk melakukan login ke dalam app akan di redirect ke `auth-web:5173/login` apabila belum memiliki session. di redirect ke `/authorize` apabila sudah memiliki session.
+* `/dashboard` - Page dashboard awal setelah berhasil login
+* `/login/mfa` - Page untuk melakukan setup mfa
+
 ## 7. Bonus yang Dikerjakan
-<!-- On Pregress -->
+
+Berikut adalah daftar fitur bonus yang telah diimplementasikan secara penuh dalam sistem ini:
+
+| Kode | Nama Fitur | Status | Ringkasan Implementasi |
+| :---: | :--- | :---: | :--- |
+| **B01** | Custom Identity Provider & SSO | ✅ Selesai | SSO terpusat & distribusi pembatalan sesi atomik via *Transactional Outbox*. |
+| **B02** | Observability & Metrics Dashboard | ✅ Selesai | Agregasi metrik `prom-client` & dashboard visual real-time (Latency, Queue, DLQ). |
+| **B03** | Health Check Probes (Liveness & Readiness) | ✅ Selesai | Standar probe `/health/live` & `/health/ready` terisolasi di seluruh service. |
+
+---
+
+### B01 — Custom Identity Provider & Single Sign-On (SSO)
+
+* **Deskripsi:** Mengimplementasikan Identity Provider (IdP) dan SSO mandiri tanpa layanan pihak ketiga untuk mengelola otentikasi lintas aplikasi (App A & App B).
+* **Fitur Utama:**
+  * **Atomicity & Outbox Pattern:** Setiap aksi keamanan (seperti logout/revokasi sesi) ditulis bersamaan dengan event outbox dalam satu transaksi database (`prisma.$transaction`).
+  * **Asynchronous Event Sync:** `sync-worker` mendistribusikan sinyal logout ke seluruh client apps dengan garansi pengiriman *at-least-once*, otomatis melakukan *retry*, dan memindahkan tugas ke Dead Letter Queue (DLQ) jika terus mengalami kegagalan.
+
+---
+
+### B02 — Observability & Real-Time Metrics Dashboard
+
+* **Deskripsi:** Sistem pemantauan performa dan metrik kesehatan internal yang disajikan melalui dashboard visual berbasis React.
+* **Fitur Utama:**
+  * **Agregasi Metrik Prometheus:** Mengukur *total requests*, *error rate*, *average latency* (ms), *queue depth*, dan *DLQ count* menggunakan `prom-client`.
+  * **Single-Endpoint Aggregator:** Endpoint `GET /metrics` pada Auth Server mem-fetch status *liveness* service lain secara internal (*back-channel*) untuk menghindari kendala CORS dan isu keamanan port internal.
+
+### B03 — Health Check Probes (Liveness & Readiness)
+
+* **Deskripsi:** Pemisahan logika probe kesehatan aplikasi untuk mendukung manajemen daur hidup kontainer (*Graceful Degradation* & *Auto-healing*).
+* **Fitur Utama:**
+  * **Liveness (`/health/live`):** Memastikan proses aplikasi/Node.js tidak mengalami *freeze* atau *deadlock* tanpa memeriksa dependensi luar.
+  * **Readiness (`/health/ready`):** Memastikan koneksi Primary DB dan skema tabel outbox siap menerima *traffic* (`503 Service Unavailable` jika DB mati).
 
 ## 8. Tangkapan Layar (Screenshots)
