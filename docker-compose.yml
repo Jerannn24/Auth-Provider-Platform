@@ -86,9 +86,6 @@ services:
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-db:5432/${POSTGRES_DB_GLOBAL}?schema=public
     ports:
       - "5173:5173"
-    volumes:
-      - ./auth-provider/auth-web:/usr/src/app/auth-web
-      - /usr/src/app/auth-web/node_modules
     depends_on:
       postgres-db:
         condition: service_healthy
