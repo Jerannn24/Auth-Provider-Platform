@@ -19,7 +19,7 @@ export async function GET() {
     const code_verifier = crypto.randomUUID();
 
     const redirectUrl = new URL("http://localhost:8080/authorize");
-    redirectUrl.searchParams.set("client_id", process.env.CLIENT_ID!);
+    redirectUrl.searchParams.set("client_id", process.env.CLIENT_ID_A!);
     redirectUrl.searchParams.set("redirect_uri", "http://localhost:3001/auth/callback");
     redirectUrl.searchParams.set("state", state);
     redirectUrl.searchParams.set("code_challenge", crypto.createHash('sha256').update(code_verifier).digest('hex'));

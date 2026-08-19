@@ -49,7 +49,7 @@ export async function GET(request: Request) {
         body: JSON.stringify({ 
             code,
             code_verifier,
-            client_secret: process.env.CLIENT_SECRET,
+            client_secret: process.env.CLIENT_SECRET_A,
         }),
     });
     
