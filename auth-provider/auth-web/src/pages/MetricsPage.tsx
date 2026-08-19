@@ -65,13 +65,6 @@ export default function ObservabilityDashboard() {
     return <div className="p-8 text-gray-500">Memuat dashboard observabilitas...</div>;
   }
 
-  const services = metrics.services || {
-    authServer: true,
-    controlPanel: true,
-    syncWorker: true,
-    database: true,
-  };
-
   return (
     <div className="min-h-screen bg-gray-100 p-8">
       <div className="max-w-6xl mx-auto space-y-6">
