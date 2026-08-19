@@ -9,4 +9,4 @@ RUN npm install
 
 COPY auth-provider/db .
 
-CMD ["sh", "-c", "npx prisma migrate deploy && npx prisma db seed"]
+CMD ["sh", "-c", "npx prisma generate && npx prisma migrate deploy && npx prisma db seed"]

@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient, Effect, Status} from "../generated/prisma/client";
+import { PrismaClient, Effect, Status} from "@prisma/client";
 import * as bcrypt from "bcrypt";
 import crypto from "crypto";
 
