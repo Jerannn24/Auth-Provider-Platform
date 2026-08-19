@@ -47,7 +47,7 @@ services:
     ports:
       - "3000:3000"
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:3000/ || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/health/ready || exit 1"]
       interval: 3s
       timeout: 3s
       retries: 5
@@ -70,7 +70,7 @@ services:
       db-global:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB_GLOBAL}"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready || exit 1"]
       interval: 3s
       timeout: 3s
       retries: 5
@@ -129,5 +129,10 @@ services:
         condition: service_healthy
       db-global:
         condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9090/health/ready || exit 1"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
 volumes:
   db-global-data:

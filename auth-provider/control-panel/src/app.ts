@@ -2,6 +2,7 @@ import express, { type Express, type Request, type Response, type NextFunction }
 // 1. Import router modul dari folder routes/
 import groupRouter from './routes/groups.route';
 import userRouter from './routes/users.route';
+import healthRouter from './routes/health.routes';
 
 const app: Express = express();
 const PORT = 3000;
@@ -15,6 +16,7 @@ app.get('/', (req: Request, res: Response) => {
 
 app.use('/api/', groupRouter);
 app.use('/api/', userRouter);
+app.use('/', healthRouter);
 
 app.use((req: Request, res: Response) => {
   res.status(404).json({ error: 'Endpoint tidak ditemukan' });

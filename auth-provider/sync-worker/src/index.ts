@@ -5,7 +5,7 @@ let isRunning = true;
 const POLL_INTERVAL_MS = 1000;
 
 async function runWorker() {
-  console.log('🚀 [Sync Worker] Service started. Processing events...');
+  console.log('[Sync Worker] Service started. Processing events...');
 
   while (isRunning) {
     try {
@@ -24,7 +24,7 @@ async function runWorker() {
 }
 
 const shutdown = () => {
-  console.log('⚠️ [Sync Worker] Shutting down gracefully...');
+  console.log('[Sync Worker] Shutting down gracefully...');
   isRunning = false;
 };
 
