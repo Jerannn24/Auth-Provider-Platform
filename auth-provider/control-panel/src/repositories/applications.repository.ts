@@ -3,7 +3,7 @@ import { prisma, Effect } from "../../../db";
 // Mendapatkan semua aplikasi
 export const getAllApplications = async () => {
     return await prisma.applications.findMany({
-        select: { id: true, name: true, description: true, createdAt: true }
+        select: { id: true, name: true, client_id: true, launch_url: true, created_at: true }
     });
 }
 
@@ -54,7 +54,7 @@ export const updateGroupsInApplication = async (applicationId: string, groupId: 
             group_id: groupId
         },
         data: {
-            effect
+            effect: effect
         }
     });
 }

@@ -723,4 +723,52 @@ router.route("/userinfo")
         }
     });
 
+router.route("/me")
+    .get(async (req, res) => {
+        try {
+            const sessionToken = req.cookies?.session_token;
+
+            if (!sessionToken) {
+                return res.status(401).json({ error: 'Unauthorized', message: 'Sesi tidak ditemukan' });
+            }
+
+            const sessionTokenHash = crypto.createHash('sha256').update(sessionToken).digest('hex');
+            const session = await sessionRepository.getSessionByToken(sessionTokenHash);
+
+            if (!session || session.status !== SSOStatus.ACTIVE) {
+                return res.status(401).json({ error: 'Unauthorized', message: 'Sesi tidak valid' });
+            }
+
+            if (session.expires_at < new Date()) {
+                return res.status(401).json({ error: 'Unauthorized', message: 'Sesi telah kedaluwarsa' });
+            }
+
+            const user = await authRepository.findUserById(session.user_id);
+            if (!user) {
+                return res.status(404).json({ error: 'User tidak ditemukan' });
+            }
+
+            const isActive = await authRepository.isActiveUser(user.id);
+            if (!isActive) {
+                return res.status(403).json({ error: 'User tidak aktif' });
+            }
+
+            const userInfo = await utilRepository.getUserInfo({ user_id: user.id } as any);
+
+            return res.status(200).json({
+                id: user.id,
+                email: user.email,
+                name: user.name,
+                status: user.status,
+                groups: userInfo?.user_groups?.map(ug => ug.group.name) ?? [],
+                session: {
+                    id: session.id,
+                    expires_at: session.expires_at
+                }
+            });
+        } catch (error) {
+            return res.status(500).json({ error: 'Terjadi kesalahan pada server' });
+        }
+    });
+    
 export default router;

@@ -3,6 +3,7 @@ import LoginPage from "./pages/Loginpage";
 import LogoutPage from "./pages/LogoutPage";
 import ChangePasswordPage from "./pages/ChangePasswordPage";
 import MetricsPage from "./pages/MetricsPage";
+import AdminPage from "./pages/admin/AdminPage";
 
 export default function App() {
   return (
@@ -11,6 +12,7 @@ export default function App() {
       <Route path="/logout" element={<LogoutPage />} />
       <Route path="/change-password" element={<ChangePasswordPage />} />
       <Route path="/metrics" element={<MetricsPage />} />
+      <Route path="/admin" element={<AdminPage />} />
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );

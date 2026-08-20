@@ -1,3 +1,4 @@
+import { NextFunction } from "express";
 import { prisma } from "../../../db";
 
 export const createSession = async (userId: string, sessionTokenHash: string, expiresAt: Date, ip_address: string) => {
@@ -37,6 +38,17 @@ export const revokeAllSessionsByUserId = async (userId: string) => {
         },
         data: {
             status: "REVOKED"
+        }
+    });
+}
+
+export const expiredSession = async (sessionTokenHash: string) => {
+    return await prisma.sso_sessions.updateMany({
+        where: {
+            session_token_hash: sessionTokenHash,
+        },
+        data: {
+            status: "EXPIRED"
         }
     });
 }
