@@ -109,6 +109,24 @@ services:
       interval: 3s
       timeout: 3s
       retries: 5
+  app-b:
+    build:
+      context: .
+      dockerfile: ./application/app-b/Dockerfile
+    container_name: app-b
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - "3002:3002"
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3002/ || exit 1"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
   sync-worker:
     build:
       context: .

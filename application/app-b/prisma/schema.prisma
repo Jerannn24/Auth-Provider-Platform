@@ -1,0 +1,60 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum SSOStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+}
+
+enum ActivityStatus {
+  SUCCESS
+  FAILURE
+}
+
+model local_sessions {
+  id  String   @id @default(uuid()) @db.Uuid
+  session_token_hash String 
+  external_user_id String @db.Uuid 
+  central_session_id String @db.Uuid
+  status SSOStatus @default(ACTIVE)
+  created_at DateTime @default(now())
+  expires_at DateTime
+  last_activity_at DateTime @default(now())
+
+  revoked_at DateTime?
+  revoke_reason String?
+}
+
+model profil_cache {
+  external_user_id String @id @db.Uuid
+  name String
+  email String
+  groups String[]
+  synced_at DateTime @default(now())
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model processed_events {
+  event_id String @id @default(uuid()) @db.Uuid
+  event_type String
+  processed_at DateTime @default(now())
+  result String
+}
+
+model activity_logs {
+  id String @id @default(uuid()) @db.Uuid
+  correlation_id String? @db.Uuid
+  state String
+  status ActivityStatus
+  metadata Json?
+  performed_at DateTime @default(now())
+
+  @@index([correlation_id, performed_at])
+}

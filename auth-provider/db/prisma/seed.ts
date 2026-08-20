@@ -200,7 +200,7 @@ async function main() {
             client_id: "app-b",
             client_secret_hash: crypto.createHash('sha256').update("app-b-secret").digest('hex'),
             status: Status.ACTIVE,
-            logout_notification_url: "http://app-a:3002/internal/logout",
+            logout_notification_url: "http://app-b:3002/internal/logout",
         }
     });
 
