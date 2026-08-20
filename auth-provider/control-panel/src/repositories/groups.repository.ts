@@ -47,3 +47,21 @@ export const getUsersByGroupId = async (groupId: string) => {
         select: { id: true, name: true, email: true, status: true, created_at: true }
     });
 }
+
+export const addUserToGroup = async (groupId: string, userId: string) => {
+    return await prisma.user_groups.create({
+        data: {
+            user_id: userId,
+            group_id: groupId
+        },  
+    });
+}
+
+export const removeUserFromGroup = async (groupId: string, userId: string) => {
+    return await prisma.user_groups.deleteMany({
+        where: {
+            group_id: groupId,
+            user_id: userId
+        },
+    });
+}

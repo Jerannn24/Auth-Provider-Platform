@@ -42,7 +42,7 @@ export const deleteUserById = async (id: string) => {
 
 // Mengupdate status user
 export const updateUserStatusById = async (id: string, status: boolean) => {
-    const active = status ? Status.ACTIVE : Status.INACTIVE;
+    const active = !status ? Status.ACTIVE : Status.INACTIVE;
 
     return await prisma.users.update({
         where: { id },

@@ -153,6 +153,16 @@ router.route("/groups/:id")
     }).delete(async (req: Request, res: Response) => {
         try {
             const { id } = req.params;
+
+            await prisma.$transaction(async (tx) => {
+                tx.user_groups.deleteMany({
+                    where: { group_id: String(id) }
+                });
+
+                tx.application_group_policies.deleteMany({
+                    where: { group_id: String(id) }
+                });
+            });
             const deletedGroup = await groupRepository.deleteGroupById(String(id));
 
             if (!deletedGroup) {
@@ -204,6 +214,58 @@ router.route("/groups/:id/users")
             res.json(users);
         } catch (error) {
             res.status(500).json({ error: 'Internal server error' });
+        }
+    }).post(async (req: Request, res: Response) => {
+        try {
+            const { id } = req.params;
+            const { userId } = req.body;
+
+            const addUserToGroup = await groupRepository.addUserToGroup(String(id), userId);
+
+            await createAuditLogs(
+                "ADD_USERS_TO_GROUP_SUCCESS",
+                Result.SUCCESS,
+                undefined,
+                String(id),
+                undefined,
+                undefined,
+                {
+                    "MESSAGE": {
+                        "code": "ADD_USERS_TO_GROUP_SUCCESS",
+                        "message": "User berhasil ditambahkan ke group"
+                    }
+                } as any
+            );
+
+            res.status(201).json(addUserToGroup);
+        } catch (error) {
+            res.status(400).json({ error: 'Gagal menambahkan user ke group' });
+        }
+    }).delete(async (req: Request, res: Response) => {
+        try {
+            const { id } = req.params;
+            const { userId } = req.body;
+
+            const removeUserFromGroup = await groupRepository.removeUserFromGroup(String(id), userId);
+
+            await createAuditLogs(
+                "REMOVE_USERS_FROM_GROUP_SUCCESS",
+                Result.SUCCESS,
+                undefined,
+                String(id),
+                undefined,
+                undefined,
+                {
+                    "MESSAGE": {
+                        "code": "REMOVE_USERS_FROM_GROUP_SUCCESS",
+                        "message": "User berhasil dihapus dari group"
+                    }
+                } as any
+            );
+
+            res.json(removeUserFromGroup);
+        } catch (error) {
+            res.status(400).json({ error: 'Gagal menghapus user dari group' });
         }
     });
 

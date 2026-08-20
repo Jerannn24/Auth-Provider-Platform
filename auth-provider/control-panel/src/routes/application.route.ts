@@ -112,6 +112,34 @@ router.route("/applications/:id/groups")
 
             const result = await applicationRepository.deleteGroupsFromApplication(String(id), groupId);
 
+            prisma.$transaction(async (tx) => {
+                const effectedUser = await userRepository.getUserIdsToRevoke(String(id));
+                for(const user of effectedUser){
+                    const eventId = crypto.randomUUID();
+
+                    await tx.events.create({
+                        data: {
+                            id: eventId,
+                            event_type: 'AccessPolicyChanged',
+                            user_id: user,
+                            central_session_id: null,
+                            application_id: String(id),
+                            payload: {
+                                event_id: eventId,
+                                event_type: 'AccessPolicyChanged',
+                                user_id: user,
+                                sso_session_id: null,
+                                application_id: String(id),
+                                reason: 'change_policy',
+                                occured_at: new Date().toISOString(),
+                                metadata: {}
+                            },
+                            status: 'PENDING'
+                        }
+                    });
+                }
+            });
+            
             if (!result) {
                 await createAuditLogs(
                     "DELETE_GROUP_FROM_APPLICATION_FAILED",

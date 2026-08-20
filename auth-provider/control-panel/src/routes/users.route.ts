@@ -5,7 +5,7 @@ import * as userRepository from '../repositories/users.repository';
 import { createAuditLogs } from '../../../server/src/repositories/utility.repository';
 import * as sessionRepositories from '../../../server/src/repositories/session.repository';
 
-import { Result } from '../../../db';
+import { prisma, Result } from '../../../db';
 const router = Router();
 
 router.route("/users")
@@ -169,6 +169,17 @@ router.route("/users/:id")
   }).delete(async (req: Request, res: Response) => {
     try {
       const { id } = req.params; 
+      prisma.$transaction(async (tx) => {
+        await tx.user_groups.deleteMany({
+          where: { user_id: String(id) }
+        });
+
+        await tx.sso_sessions.deleteMany({
+          where: { user_id: String(id) }
+        });
+
+      });
+
       const deletedUser = await userRepository.deleteUserById(String(id));
 
       if (!deletedUser) {
@@ -262,7 +273,38 @@ router.route("/users/:id/status")
       const { isActive } = req.body;
 
       const updatedUser = await userRepository.updateUserStatusById(String(id), isActive);
-  
+
+      await prisma.$transaction(async (tx) => {
+        if (!isActive) {
+          await tx.sso_sessions.updateMany({
+            where: { user_id: String(id) },
+            data: { status: 'REVOKED' }
+          });
+
+          const eventId = crypto.randomUUID();
+          await tx.events.create({
+              data: {
+                  id: eventId,
+                  event_type: 'SessionRevoked',
+                  user_id: String(id),
+                  central_session_id: null,
+                  application_id: null, 
+                  payload: {
+                      event_id: eventId,
+                      event_type: 'SessionRevoked',
+                      user_id: String(id),
+                      sso_session_id: null,
+                      application_id: null,
+                      reason: 'user_deactivated',
+                      occured_at: new Date().toISOString(),
+                      metadata: {}
+                  },
+                  status: 'PENDING'
+              }
+          });
+        }
+      });
+
       if (!updatedUser) {
         await createAuditLogs(
           "UPDATE_USER_STATUS_FAILED",
