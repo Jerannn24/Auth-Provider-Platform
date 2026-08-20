@@ -3,6 +3,18 @@ import React, { useState, useEffect } from 'react';
 const API_BASE = 'http://localhost:3000/api';
 
 export default function Adminpage() {
+    const [user, setUser] = useState<any>(null);
+
+      useEffect(() => {
+      fetch('http://localhost:8080/me', {
+        method: 'GET',
+        credentials: 'include',
+      })
+        .then((res) => res.json())
+        .then((data) => setUser(data))
+        .catch((err) => console.error(err));
+    }, []);
+
     const [activeTab, setActiveTab] = useState<'apps' | 'groups' | 'users' | 'health'>('apps');
 
     const [applications, setApplications] = useState<any[]>([]);
@@ -237,6 +249,14 @@ export default function Adminpage() {
         });
         fetchUsers();
     };
+
+  if (!user || !user.groups?.includes('admin')) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-900 text-rose-500 font-sans">
+        Akses Ditolak. Halaman ini khusus Admin.
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-slate-900 text-slate-100 font-sans">

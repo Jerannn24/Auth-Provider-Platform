@@ -57,7 +57,7 @@ export default function ObservabilityDashboard() {
 
   useEffect(() => {
     fetchMetrics();
-    const interval = setInterval(fetchMetrics, 2000);
+    const interval = setInterval(fetchMetrics, 1000);
     return () => clearInterval(interval);
   }, []);
 

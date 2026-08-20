@@ -2,17 +2,17 @@ import { useState } from "react";
 
 export default function LogoutPage() {
     const [error, setError] = useState("");
+    const [success, setSuccess] = useState("");
     const [loading, setLoading] = useState(false);
 
     const params = new URLSearchParams(window.location.search);
-    const redirectUri = params.get("redirect_uri") || params.get("post_logout_redirect_uri");
 
     const handleLogout = async (e: React.FormEvent) => {
         e.preventDefault();
 
         setLoading(true);
         setError("");
-
+        setSuccess("");
         try {
             const response = await fetch("http://localhost:8080/logout", {
                 method: "POST",
@@ -28,12 +28,8 @@ export default function LogoutPage() {
                 setError(data.error || "Logout gagal.");
                 return;
             }
-
-            if (redirectUri) {
-                window.location.href = redirectUri;
-            } else {
-                window.location.href = "/login";
-            }
+            
+            setSuccess("Logout berhasil.");
         } catch (err: any) {
             console.error(err);
             setError(err.message || "Terjadi kesalahan saat logout.");
@@ -76,6 +72,12 @@ export default function LogoutPage() {
                         </div>
                     )}
 
+                    {success && (
+                        <div className="mb-6 bg-green-50 border border-green-200 text-green-600 text-sm p-3 rounded-lg text-left">
+                            {success}
+                        </div>
+                    )}
+
                     <form onSubmit={handleLogout} className="space-y-4">
                         <button
                             type="submit"
@@ -85,15 +87,6 @@ export default function LogoutPage() {
                             {loading ? "Memproses Logout..." : "Ya, Logout"}
                         </button>
 
-                        {redirectUri && (
-                            <button
-                                type="button"
-                                onClick={() => (window.location.href = redirectUri)}
-                                className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-lg font-medium transition"
-                            >
-                                Batal
-                            </button>
-                        )}
                     </form>
                 </div>
             </div>
