@@ -60,8 +60,8 @@ Sistem manajemen identitas terpusat, penyedia layanan otentikasi (Auth Provider)
 
 ### Alur Kerja Otentikasi Utama
 
-1. **Authorization Code Flow:** Aplikasi client mengarahkan user ke `/login` $\rightarrow$ `/authorize`. Setelah otentikasi berhasil, Auth Provider menerbitkan *authorization code* yang ditukarkan aplikasi client menjadi `access_token`.
-2. **Back-Channel Logout:** Saat sesi pusat (*sso_session*) berakhir, policy pengguna berubah, atau user mengubah password, Sync Worker mengambil event dari database dan mengirimkan webhook POST ke `/interna/logout` di seluruh aplikasi client terdaftar.
+1. **Authorization Code Flow:** Aplikasi client mengarahkan user ke `/login` $\rightarrow$ `/authorize`. Setelah otentikasi berhasil, Auth Provider menerbitkan *authorization code* yang ditukarkan aplikasi client menjadi `access_token` apabila user mengaktifkan MFA maka `access_token` tidak akan diterbitkan dan memerlukan TOTP dari google authenticator yang nantinya apabila success maka `access_token` baru akan diterbitkan.
+2. **Back-Channel Logout:** Saat sesi pusat (*sso_session*) berakhir, policy pengguna berubah, atau user mengubah password, Sync Worker mengambil event dari database dan mengirimkan webhook POST ke `/interna/logout` yang dikirim ke app client yang bersangkutan, misal apabila `sessionRevoked` dan `PasswordChanged` maka akan dikirimkan keseluruh app, sedangkan untuk `AccessPolicyChanged` hanya akan dikirimkan ke session user yang terpengaruh oleh perubahan policy dan dikirimkan ke application yang policy nya diubah.
 
 ---
 
@@ -87,12 +87,25 @@ Sistem manajemen identitas terpusat, penyedia layanan otentikasi (Auth Provider)
 
 ### D. Pilihan Soft-Delete vs Hard-Delete
 
-* **Keputusan:** Menggunakan **Soft-Delete / Status State Pattern** (`ACTIVE`, `INACTIVE`, `EXPIRED`, `REVOKED`).
+* **Keputusan:** Menggunakan **Soft-Delete / Status State Pattern** (`ACTIVE`, `INACTIVE`, `EXPIRED`, `REVOKED`). 
 * **Alasan:** Menjaga *referential integrity* relational database untuk riwayat jejak audit (`audit_logs`), serta mencegah kehilangan data historis otentikasi dan transaksi keamanan.
+
+* **Keputusan:** Menggunakan **Hard-Delete** 
+* **Alasan:** Keputusan menggunakan Hard-Delete (Cascade) dipilih agar saat Admin menghapus suatu data, semua data yang terhubung di tabel lain otomatis ikut terhapus. Dengan begitu, database selalu bersih dari data sampah dan tidak ada sisa data yang menggantung.
+
+### E. Pemilihan Stack
+* **PostgreSQL:** Database relasional yang sangat stabil dan patuh terhadap standar ACID. Sangat cocok untuk sistem autentikasi/SSO yang membutuhkan integritas data ketat, foreign key constraints, serta cascade delete yang aman antar-tabel (user, session, client, audit log).
+
+* **Prisma ORM:** Memberikan type-safety penuh dari skema database hingga ke kode TypeScript. Meminimalkan kesalahan manipulasi data, mempermudah migrasi skema, dan mempercepat pembuatan query relasional tanpa perlu menulis SQL manual.
+
+* **Express.js:** Framework backend yang lightweight, matang, dan tidak opasif (unopinionated). Sangat ideal untuk membangun core server SSO karena memberikan kontrol penuh atas pembuatan middleware, pengaturan cookie HttpOnly, header HTTP, serta penanganan protokol OAuth2/OIDC.
+
+* **Vite (React):** Bundler dan perkakas frontend yang sangat cepat dengan Hot Module Replacement (HMR) instan. Tepat digunakan untuk membangun Control Panel internal berarsitektur Single Page Application (SPA) tanpa perlu beban overhead Server-Side Rendering (SSR).
+
+* **Next.js:** Ideal untuk aplikasi klien (client app) atau portal publik yang membutuhkan keunggulan Server-Side Rendering (SSR), performa loading awal yang cepat, serta dukungan integrasi API internal yang rapi.
 
 ---
 
-### E. Metrics RED 
 ## 5. Cara Menjalankan Sistem
 
 ### Langkah 1: Persiapan Environment
@@ -101,7 +114,6 @@ Salin file `.env.example` menjadi `.env` di direktori utama:
 
 ```bash
 cp .env.example .env
-
 ```
 
 ### Langkah 2: Jalankan Container Docker Compose
@@ -110,8 +122,8 @@ Jalankan seluruh service (Database, Auth Backend, Auth UI, Sync Worker, dan App 
 
 ```bash
 docker compose up -d --build
-
 ```
+Untuk process seeding akan berjalan bersama dengan docker compose up.
 
 ### URL Akses Tiap Komponen
 
@@ -136,6 +148,7 @@ docker compose up -d --build
 * `POST /change-password` - Mengubah password user dan me-revoked session user terkait
 * `POST /token` - Menerbitkan access token dengan jwt code
 * `GET /userinfo` - Endpoint yang digunakan untuk mengambil data user
+* `GET /me` - Endpoint buat app server mengambil data user saat ini
 * `GET /health/live` - Memeriksa Liveness Auth Server
 * `GET /health/ready` - Memeriksa Readiness Auth Server
 
@@ -155,7 +168,9 @@ docker compose up -d --build
 * `GET /groups/:id` - Melihat Group berdasarkan id
 * `PUT /groups/:id` - Mengubah data Group berdasarkan id
 * `DELETE /groups/:id` - Menghapus data Group berdasarkan id
-* `GET /groups/:id/users` - Melihat user di group berdasarkan 
+* `GET /groups/:id/users` - Melihat user di group berdasarkan id
+* `POST /groups/:id/users` - menambahkan user ke group berdasarkan id 
+* `GET /groups/:id/users` - menghapus user di group berdasarkan id 
 
 #### USER Route
 * `GET /users` - Melihat semua data user
@@ -191,6 +206,7 @@ docker compose up -d --build
 * `/logout` - Page untuk melakukan logout terhadap seluruh session yang ada
 * `/change-password` - Page untuk mengubah password suatu akun
 * `/metrics` - Page untuk melihat metrics RED 
+* `/admin` - Page control panel admin 
 
 ### App A & App B
 `PORT: 3001 (appA) & 3002(appB)`
@@ -205,33 +221,58 @@ Berikut adalah daftar fitur bonus yang telah diimplementasikan secara penuh dala
 
 | Kode | Nama Fitur | Status | Ringkasan Implementasi |
 | :---: | :--- | :---: | :--- |
-| **B01** | Custom Identity Provider & SSO | ✅ Selesai | SSO terpusat & distribusi pembatalan sesi atomik via *Transactional Outbox*. |
-| **B02** | Observability & Metrics Dashboard | ✅ Selesai | Agregasi metrik `prom-client` & dashboard visual real-time (Latency, Queue, DLQ). |
-| **B03** | Health Check Probes (Liveness & Readiness) | ✅ Selesai | Standar probe `/health/live` & `/health/ready` terisolasi di seluruh service. |
+| **B01** | Custom Identity Provider & SSO | Selesai | SSO terpusat & distribusi pembatalan sesi atomik via *Transactional Outbox*. |
+| **B02** | Observability & Metrics Dashboard | Selesai | Agregasi metrik `prom-client` & dashboard visual real-time (Latency, Queue, DLQ). |
+| **B03** | Health Check Probes (Liveness & Readiness) |  Selesai | Standar probe `/health/live` & `/health/ready` terisolasi di seluruh service. |
 
 ---
 
-### B01 — Custom Identity Provider & Single Sign-On (SSO)
-
-* **Deskripsi:** Mengimplementasikan Identity Provider (IdP) dan SSO mandiri tanpa layanan pihak ketiga untuk mengelola otentikasi lintas aplikasi (App A & App B).
-* **Fitur Utama:**
-  * **Atomicity & Outbox Pattern:** Setiap aksi keamanan (seperti logout/revokasi sesi) ditulis bersamaan dengan event outbox dalam satu transaksi database (`prisma.$transaction`).
-  * **Asynchronous Event Sync:** `sync-worker` mendistribusikan sinyal logout ke seluruh client apps dengan garansi pengiriman *at-least-once*, otomatis melakukan *retry*, dan memindahkan tugas ke Dead Letter Queue (DLQ) jika terus mengalami kegagalan.
+### B01 - MFA atau WebAuthn
+* **Deskripsi:** Fitur ini mengimplementasikan lapisan keamanan ganda menggunakan algoritma Time-based One-Time Password (TOTP) yang kompatibel dengan aplikasi pihak ketiga seperti Google Authenticator, Authy, atau 1Password.
 
 ---
 
 ### B02 — Observability & Real-Time Metrics Dashboard
 
-* **Deskripsi:** Sistem pemantauan performa dan metrik kesehatan internal yang disajikan melalui dashboard visual berbasis React.
-* **Fitur Utama:**
-  * **Agregasi Metrik Prometheus:** Mengukur *total requests*, *error rate*, *average latency* (ms), *queue depth*, dan *DLQ count* menggunakan `prom-client`.
-  * **Single-Endpoint Aggregator:** Endpoint `GET /metrics` pada Auth Server mem-fetch status *liveness* service lain secara internal (*back-channel*) untuk menghindari kendala CORS dan isu keamanan port internal.
+* **Deskripsi:** Sistem pemantauan performa dan metrik kesehatan internal yang disajikan melalui dashboard visual berbasis React dengan pendekatan metrics RED.
 
 ### B03 — Health Check Probes (Liveness & Readiness)
 
 * **Deskripsi:** Pemisahan logika probe kesehatan aplikasi untuk mendukung manajemen daur hidup kontainer (*Graceful Degradation* & *Auto-healing*).
-* **Fitur Utama:**
-  * **Liveness (`/health/live`):** Memastikan proses aplikasi/Node.js tidak mengalami *freeze* atau *deadlock* tanpa memeriksa dependensi luar.
-  * **Readiness (`/health/ready`):** Memastikan koneksi Primary DB dan skema tabel outbox siap menerima *traffic* (`503 Service Unavailable` jika DB mati).
 
 ## 8. Tangkapan Layar (Screenshots)
+### Auth Wen App:
+#### Login Page:
+![alt text](docs/sso_login.png)
+
+#### Logout Page:
+![alt text](docs/sso_logout.png)
+
+#### Change Password Page:
+![alt text](docs/sso_change-password.png)
+
+#### Metrics Page:
+![alt text](docs/sso_metrics.png)
+
+### Control Panel Admin:
+#### Applications:
+![alt text](docs/control-panel-apps.png)
+
+#### Groups:
+![alt text](docs/control-panel-groups.png)
+
+#### Users:
+![alt text](docs/control-panel-users.png)
+
+#### Healths:
+![alt text](docs/control-panel-healths.png)
+
+### App A and App B
+#### Login Page:
+![alt text](docs/app-login.png)
+
+#### Dashboard Page:
+![alt text](docs/app-dashboard.png)
+
+#### MFA Page:
+![alt text](docs/app-MFA.png)
