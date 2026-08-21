@@ -58,6 +58,23 @@ Sistem manajemen identitas terpusat, penyedia layanan otentikasi (Auth Provider)
 
 ```
 
+### Stuktur Folder 
+
+```text
+project-root/
+├── auth-provider/          # Layanan inti Auth Provider & Identity Server
+│   ├── auth-web/           # Frontend antarmuka interaksi login / autentikasi user
+│   ├── control-panel/      # Backend layanan manajemen user, group, client, & aplikasi
+│   ├── db/                 # Skema database, migrasi, dan konfigurasi Prisma ORM
+│   ├── server/             # Core OAuth2/OIDC Authorization & Token Server (Express.js)
+│   └── sync-worker/        # Background worker asinkron untuk pemrosesan event
+├── applications/           # Kumpulan aplikasi klien yang terintegrasi dengan SSO
+│   ├── app-a/              # Aplikasi Klien A 
+│   └── app-b/              # Aplikasi Klien B 
+├── docs/                   # Dokumentasi teknis proyek
+├── docker-compose.yml      # Orkestrasi container Docker untuk seluruh service
+└── README.md               # Dokumentasi utama proyek
+```
 ### Alur Kerja Otentikasi Utama
 
 1. **Authorization Code Flow:** Aplikasi client mengarahkan user ke `/login` $\rightarrow$ `/authorize`. Setelah otentikasi berhasil, Auth Provider menerbitkan *authorization code* yang ditukarkan aplikasi client menjadi `access_token` apabila user mengaktifkan MFA maka `access_token` tidak akan diterbitkan dan memerlukan TOTP dari google authenticator yang nantinya apabila success maka `access_token` baru akan diterbitkan.
