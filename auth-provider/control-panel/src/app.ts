@@ -5,6 +5,7 @@ import healthRouter from './routes/health.routes';
 import appRouter from './routes/application.route';
 
 import cors from 'cors';
+import { prisma } from '../../db';
 
 const app: Express = express();
 const PORT = 3000;
@@ -35,6 +36,42 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   res.status(500).json({ error: 'Internal Server Error', message: err.message });
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+const controlPanel = app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
+
+
+let isShuttingDown = false;
+
+const gracefulShutdown = async (signal: string) => {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+
+    console.log(`[Server] Received ${signal}. Initiating graceful shutdown...`);
+
+    const forceExitTimer = setTimeout(() => {
+        console.error('[Server] Forcefully exiting due to timeout.');
+        process.exit(1);
+    }, 10000);
+
+    try{
+        await new Promise<void>((resolve, reject) => {
+            controlPanel.close((err) => {
+                if (err) return reject(err);
+                resolve();
+                });
+        });
+
+        await prisma.$disconnect();
+        console.log('[Server] Database connection closed. Exiting...');
+
+        clearTimeout(forceExitTimer);
+        process.exit(0);
+    } catch (error) {
+        console.error('[Server] Error occurred during graceful shutdown:', error);
+        process.exit(1);
+    }
+};
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));

@@ -6,8 +6,9 @@ import mfaRouter from './routes/mfa.routes';
 import metricRouter from './routes/metrics.routes';
 import healthRouter from './routes/health.routes';
 import { startWorkerHealthServer } from "./health";
-
 import { metricsMiddleware } from './services/metrics.service';
+import { prisma } from '../../db';
+import { Server } from 'node:http';
 
 startWorkerHealthServer();
 
@@ -34,6 +35,41 @@ app.use('/', mfaRouter);
 app.use('/', metricRouter);
 app.use('/', healthRouter);
 
-app.listen(PORT, '0.0.0.0', () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
+
+let isShuttingDown = false;
+
+const gracefulShutdown = async (signal: string) => {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+
+    console.log(`[Server] Received ${signal}. Initiating graceful shutdown...`);
+
+    const forceExitTimer = setTimeout(() => {
+        console.error('[Server] Forcefully exiting due to timeout.');
+        process.exit(1);
+    }, 10000);
+
+    try{
+        await new Promise<void>((resolve, reject) => {
+            server.close((err) => {
+                if (err) return reject(err);
+                resolve();
+                });
+        });
+
+        await prisma.$disconnect();
+        console.log('[Server] Database connection closed. Exiting...');
+
+        clearTimeout(forceExitTimer);
+        process.exit(0);
+    } catch (error) {
+        console.error('[Server] Error occurred during graceful shutdown:', error);
+        process.exit(1);
+    }
+};
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));

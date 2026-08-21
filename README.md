@@ -221,25 +221,29 @@ Berikut adalah daftar fitur bonus yang telah diimplementasikan secara penuh dala
 
 | Kode | Nama Fitur | Status | Ringkasan Implementasi |
 | :---: | :--- | :---: | :--- |
-| **B01** | Custom Identity Provider & SSO | Selesai | SSO terpusat & distribusi pembatalan sesi atomik via *Transactional Outbox*. |
-| **B02** | Observability & Metrics Dashboard | Selesai | Agregasi metrik `prom-client` & dashboard visual real-time (Latency, Queue, DLQ). |
-| **B03** | Health Check Probes (Liveness & Readiness) |  Selesai | Standar probe `/health/live` & `/health/ready` terisolasi di seluruh service. |
+| **B01** | MFA atau WebAuthn | Selesai | TOTP dengan google authenticatior|
+| **B02** | Observability | Selesai | Agregasi metrik `prom-client` & dashboard visual real-time (Latency, Queue, DLQ). |
+| **B03** |  Liveness dan Readiness Probe |  Selesai | Standar probe `/health/live` & `/health/ready` terisolasi di seluruh service. |
+| **B04** | Graceful Shutdown |  Selesai | Draining koneksi HTTP/worker, pemutusan koneksi database Prisma secara rapi, & safety timeout. |
 
 ---
 
 ### B01 - MFA atau WebAuthn
 * **Deskripsi:** Fitur ini mengimplementasikan lapisan keamanan ganda menggunakan algoritma Time-based One-Time Password (TOTP) yang kompatibel dengan aplikasi pihak ketiga seperti Google Authenticator, Authy, atau 1Password.
 
----
-
-### B02 — Observability & Real-Time Metrics Dashboard
+### B02 — Observability 
 
 * **Deskripsi:** Sistem pemantauan performa dan metrik kesehatan internal yang disajikan melalui dashboard visual berbasis React dengan pendekatan metrics RED.
 
-### B03 — Health Check Probes (Liveness & Readiness)
+### B03 —  Liveness dan Readiness Probe
 
 * **Deskripsi:** Pemisahan logika probe kesehatan aplikasi untuk mendukung manajemen daur hidup kontainer (*Graceful Degradation* & *Auto-healing*).
 
+### B04 - Graceful Shutdown
+
+* **Deskripsi:** Mekanisme penutupan layanan secara aman yang memastikan pemrosesan tugas aktif (in-flight tasks) terselesaikan, pemutusan koneksi database secara terstruktur, serta pencegahan zombie process menggunakan safety timeout.
+
+---
 ## 8. Tangkapan Layar (Screenshots)
 ### Auth Wen App:
 #### Login Page:
@@ -276,3 +280,4 @@ Berikut adalah daftar fitur bonus yang telah diimplementasikan secara penuh dala
 
 #### MFA Page:
 ![alt text](docs/app-MFA.png)
+
